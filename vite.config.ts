@@ -4,7 +4,7 @@ import { defineConfig, type ViteDevServer } from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { optimizeCssModules } from 'vite-plugin-optimize-css-modules';
 import tsconfigPaths from 'vite-tsconfig-paths';
-
+import webcontainerVitePlugin from './.vite/plugins/webcontainer-files';
 export default defineConfig((config) => {
   return {
     build: {
@@ -15,6 +15,9 @@ export default defineConfig((config) => {
         include: ['path', 'buffer'],
       }),
       config.mode !== 'test' && remixCloudflareDevProxy(),
+      webcontainerVitePlugin({
+        directory: './app/lib/webcontainer/files',
+      }),
       remixVitePlugin({
         future: {
           v3_fetcherPersist: true,

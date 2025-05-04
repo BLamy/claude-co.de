@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { motion, type HTMLMotionProps, type Variants } from 'framer-motion';
 import { computed } from 'nanostores';
-import { memo, useCallback, useEffect } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
   type OnChangeCallback as OnEditorChange,
@@ -11,11 +11,14 @@ import { IconButton } from '~/components/ui/IconButton';
 import { PanelHeaderButton } from '~/components/ui/PanelHeaderButton';
 import { Slider, type SliderOptions } from '~/components/ui/Slider';
 import { workbenchStore, type WorkbenchViewType } from '~/lib/stores/workbench';
+import { WORK_DIR } from '~/utils/constants';
 import { classNames } from '~/utils/classNames';
 import { cubicEasingFn } from '~/utils/easings';
 import { renderLogger } from '~/utils/logger';
 import { EditorPanel } from './EditorPanel';
 import { Preview } from './Preview';
+import { TestExplorerPanel } from './TestExplorerPanel';
+import { FileTree } from './FileTree';
 
 interface WorkspaceProps {
   chatStarted?: boolean;
@@ -63,6 +66,8 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
   const files = useStore(workbenchStore.files);
   const selectedView = useStore(workbenchStore.currentView);
 
+  const [activeSidebarPanel, setActiveSidebarPanel] = useState<'files' | 'tests'>('files');
+
   const setSelectedView = (view: WorkbenchViewType) => {
     workbenchStore.currentView.set(view);
   };
@@ -70,6 +75,8 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
   useEffect(() => {
     if (hasPreview) {
       setSelectedView('preview');
+    } else {
+      setSelectedView('code');
     }
   }, [hasPreview]);
 
@@ -99,6 +106,10 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
     workbenchStore.resetCurrentDocument();
   }, []);
 
+  const toggleSidebarPanel = useCallback((panel: 'files' | 'tests') => {
+    setActiveSidebarPanel(panel);
+  }, []);
+
   return (
     chatStarted && (
       <motion.div
@@ -122,15 +133,22 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
                 <Slider selected={selectedView} options={sliderOptions} setSelected={setSelectedView} />
                 <div className="ml-auto" />
                 {selectedView === 'code' && (
-                  <PanelHeaderButton
-                    className="mr-1 text-sm"
-                    onClick={() => {
-                      workbenchStore.toggleTerminal(!workbenchStore.showTerminal.get());
-                    }}
-                  >
-                    <div className="i-ph:terminal" />
-                    Toggle Terminal
-                  </PanelHeaderButton>
+                  <>
+                    <PanelHeaderButton
+                      className="mr-1 text-sm"
+                      onClick={() => {
+                        workbenchStore.toggleTerminal(!workbenchStore.showTerminal.get());
+                      }}
+                    >
+                      <div className="i-ph:terminal" />
+                      Toggle Terminal
+                    </PanelHeaderButton>
+
+                    <PanelHeaderButton className="mr-1 text-sm" onClick={() => toggleSidebarPanel('tests')}>
+                      <div className="i-ph:bug" />
+                      Test Explorer
+                    </PanelHeaderButton>
+                  </>
                 )}
                 <IconButton
                   icon="i-ph:x-circle"
@@ -146,18 +164,74 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
                   initial={{ x: selectedView === 'code' ? 0 : '-100%' }}
                   animate={{ x: selectedView === 'code' ? 0 : '-100%' }}
                 >
-                  <EditorPanel
-                    editorDocument={currentDocument}
-                    isStreaming={isStreaming}
-                    selectedFile={selectedFile}
-                    files={files}
-                    unsavedFiles={unsavedFiles}
-                    onFileSelect={onFileSelect}
-                    onEditorScroll={onEditorScroll}
-                    onEditorChange={onEditorChange}
-                    onFileSave={onFileSave}
-                    onFileReset={onFileReset}
-                  />
+                  <div className="h-full flex">
+                    <div className="w-[250px] h-full border-r border-bolt-elements-borderColor">
+                      <div className="flex items-center bg-bolt-elements-background-depth-1 border-b border-bolt-elements-borderColor">
+                        <div className="flex w-full">
+                          <button
+                            className={classNames(
+                              'flex-1 py-2 px-3 font-medium text-sm',
+                              activeSidebarPanel === 'files'
+                                ? 'bg-bolt-elements-background-depth-0 border-b-2 border-bolt-brand'
+                                : 'text-bolt-elements-textSecondary hover:bg-bolt-elements-background-depth-0',
+                            )}
+                            onClick={() => toggleSidebarPanel('files')}
+                          >
+                            <div className="flex items-center justify-center">
+                              <div className="i-ph:folder mr-2" />
+                              Files
+                            </div>
+                          </button>
+                          <button
+                            className={classNames(
+                              'flex-1 py-2 px-3 font-medium text-sm',
+                              activeSidebarPanel === 'tests'
+                                ? 'bg-bolt-elements-background-depth-0 border-b-2 border-bolt-brand'
+                                : 'text-bolt-elements-textSecondary hover:bg-bolt-elements-background-depth-0',
+                            )}
+                            onClick={() => toggleSidebarPanel('tests')}
+                          >
+                            <div className="flex items-center justify-center">
+                              <div className="i-ph:bug mr-2" />
+                              Tests
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="h-[calc(100%-40px)] overflow-hidden">
+                        {activeSidebarPanel === 'files' ? (
+                          <FileTree
+                            className="h-full p-2"
+                            files={files}
+                            hideRoot
+                            unsavedFiles={unsavedFiles}
+                            rootFolder={WORK_DIR}
+                            selectedFile={selectedFile}
+                            onFileSelect={onFileSelect}
+                          />
+                        ) : (
+                          <TestExplorerPanel />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex-1 h-full">
+                      <EditorPanel
+                        editorDocument={currentDocument}
+                        isStreaming={isStreaming}
+                        selectedFile={selectedFile}
+                        files={files}
+                        unsavedFiles={unsavedFiles}
+                        onFileSelect={onFileSelect}
+                        onEditorScroll={onEditorScroll}
+                        onEditorChange={onEditorChange}
+                        onFileSave={onFileSave}
+                        onFileReset={onFileReset}
+                        hideFileExplorer={true}
+                      />
+                    </div>
+                  </div>
                 </View>
                 <View
                   initial={{ x: selectedView === 'preview' ? 0 : '100%' }}

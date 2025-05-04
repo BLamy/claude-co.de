@@ -1,6 +1,9 @@
 import { WebContainer } from '@webcontainer/api';
 import { WORK_DIR_NAME } from '~/utils/constants';
 
+// @ts-ignore - virtual module
+import { files } from 'virtual:webcontainer-files';
+
 interface WebContainerContext {
   loaded: boolean;
 }
@@ -24,8 +27,10 @@ if (!import.meta.env.SSR) {
       .then(() => {
         return WebContainer.boot({ workdirName: WORK_DIR_NAME });
       })
-      .then((webcontainer) => {
+      .then(async (webcontainer) => {
         webcontainerContext.loaded = true;
+        await webcontainer.mount(files);
+
         return webcontainer;
       });
 

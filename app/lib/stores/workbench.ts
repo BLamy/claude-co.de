@@ -9,6 +9,7 @@ import { EditorStore } from './editor';
 import { FilesStore, type FileMap } from './files';
 import { PreviewsStore } from './previews';
 import { TerminalStore } from './terminal';
+import { TestStore, type DebugStep } from './test';
 
 export interface ArtifactState {
   id: string;
@@ -21,13 +22,14 @@ export type ArtifactUpdateState = Pick<ArtifactState, 'title' | 'closed'>;
 
 type Artifacts = MapStore<Record<string, ArtifactState>>;
 
-export type WorkbenchViewType = 'code' | 'preview';
+export type WorkbenchViewType = 'code' | 'test' | 'preview';
 
 export class WorkbenchStore {
   #previewsStore = new PreviewsStore(webcontainer);
   #filesStore = new FilesStore(webcontainer);
   #editorStore = new EditorStore(this.#filesStore);
   #terminalStore = new TerminalStore(webcontainer);
+  #testStore = new TestStore(webcontainer);
 
   artifacts: Artifacts = import.meta.hot?.data.artifacts ?? map({});
 
@@ -270,6 +272,62 @@ export class WorkbenchStore {
   #getArtifact(id: string) {
     const artifacts = this.artifacts.get();
     return artifacts[id];
+  }
+
+  get testSuites() {
+    return this.#testStore.testSuites;
+  }
+
+  get selectedTestSteps() {
+    return this.#testStore.selectedTestSteps;
+  }
+
+  get currentStepIndex() {
+    return this.#testStore.currentStepIndex;
+  }
+
+  get testStatus() {
+    return this.#testStore.testStatus;
+  }
+
+  get testStats() {
+    return this.#testStore.testStats;
+  }
+
+  get highlightedLine() {
+    return this.#testStore.highlightedLine;
+  }
+
+  async runTests() {
+    await this.#testStore.runTests();
+  }
+
+  selectTest(testSteps: DebugStep[]) {
+    this.#testStore.selectTest(testSteps);
+  }
+
+  goToTestStep(index: number) {
+    // clear any existing highlight first to ensure we see the change
+    // when stepping within the same file
+    this.#testStore.clearHighlight();
+    
+    // directly go to step without delays
+    this.#testStore.goToStep(index);
+
+    const highlightedLine = this.#testStore.highlightedLine.get();
+    console.log('DEBUG - WorkbenchStore - goToTestStep - highlightedLine:', highlightedLine);
+
+    if (highlightedLine) {
+      // Set the selected file to ensure it's loaded
+      this.setSelectedFile(highlightedLine.filePath);
+      
+      // The highlighting is now handled by the reactive effect in the editor component
+      // that watches for changes to highlightedLine
+    }
+  }
+
+  clearTestHighlight() {
+    this.#testStore.clearHighlight();
   }
 }
 

@@ -16,6 +16,12 @@
   /* Active Line */
 
   --cm-activeLineBackgroundColor: var(--bolt-elements-editor-activeLineBackgroundColor, rgb(224 231 235 / 30%));
+  
+  /* Debug Highlight */
+  
+  --cm-debug-highlight-background: rgba(255, 165, 0, 0.3);
+  --cm-debug-highlight-text: rgba(255, 165, 0, 0.6);
+  --cm-debug-highlight-border: rgba(255, 165, 0, 0.8);
 
   /* Cursor */
 
@@ -133,3 +139,119 @@ html[data-theme='dark'] {
   --bolt-elements-editor-search-button-backgroundColor: theme('colors.gray.800');
   --bolt-elements-editor-search-button-backgroundColorHover: theme('colors.alpha.white.10');
 }
+
+/* Debug highlighting styles */
+.cm-debug-highlight-background {
+  background-color: var(--cm-debug-highlight-background) !important;
+  border-left: 3px solid var(--cm-debug-highlight-border) !important;
+  animation: pulse-debug-line 2s ease-in-out 1;
+}
+
+.cm-debug-highlight-text {
+  background-color: var(--cm-debug-highlight-text) !important;
+  border-radius: 2px;
+}
+
+@keyframes pulse-debug-line {
+  0% {
+    background-color: rgba(255, 165, 0, 0.8);
+  }
+  100% {
+    background-color: var(--cm-debug-highlight-background);
+  }
+}
+
+
+
+/* CodeMirror */
+.cm-editor {
+  height: 100%;
+  overflow: auto !important;
+}
+
+.cm-scroller {
+  overflow: auto !important;
+}
+
+.cm-debugger-highlight {
+  background-color: rgba(65, 184, 131, 0.3);
+  border-radius: 2px;
+  padding: 0 3px;
+  margin: 0 -3px;
+}
+
+.cm-line:has(.cm-debugger-highlight) {
+  background-color: rgba(65, 184, 131, 0.1);
+  border-left: 3px solid rgb(65, 184, 131);
+  padding-left: 8px !important;
+  margin-left: -11px;
+}
+
+
+.timeline {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: #2a2a2a;
+}
+
+.timeline-track {
+  width: 100%;
+  height: 4px;
+  background: #3c3c3c;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.timeline-point {
+  width: 10px;
+  height: 10px;
+  background: #555;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.timeline-point:hover {
+  transform: scale(1.3);
+}
+
+.timeline-point.active {
+  background: #3BB446;
+  transform: scale(1.2);
+}
+
+.variables-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 12px;
+}
+
+.variable {
+  padding: 8px 12px;
+  border-bottom: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.variable.changed {
+  background: rgba(59, 180, 70, 0.1);
+  border-left: 3px solid #3BB446;
+}
+
+.var-name {
+  font-weight: bold;
+  margin-right: 1rem;
+  color: #9cdcfe;
+}
+
+.undefined { color: #888; }
+.null { color: #888; }
+.boolean { color: #569cd6; }
+.number { color: #b5cea8; }
+.string { color: #ce9178; }
+.object { color: #4ec9b0; }

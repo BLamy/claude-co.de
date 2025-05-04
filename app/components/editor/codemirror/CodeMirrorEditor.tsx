@@ -15,6 +15,8 @@ import {
   showTooltip,
   tooltips,
   type Tooltip,
+  Decoration,
+  type DecorationSet,
 } from '@codemirror/view';
 import { memo, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { Theme } from '~/types/theme';
@@ -25,6 +27,8 @@ import { BinaryContent } from './BinaryContent';
 import { getTheme, reconfigureTheme } from './cm-theme';
 import { indentKeyBinding } from './indent';
 import { getLanguage } from './languages';
+import { workbenchStore } from '~/lib/stores/workbench';
+import { useStore } from '@nanostores/react';
 
 const logger = createScopedLogger('CodeMirrorEditor');
 
@@ -115,6 +119,30 @@ const editableStateField = StateField.define<boolean>({
   },
 });
 
+const clearHighlight = StateEffect.define<null>();
+const addHighlight = StateEffect.define<DecorationSet>();
+const highlightField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none;
+  },
+  update(decorations, tr) {
+    decorations = decorations.map(tr.changes);
+
+    for (const effect of tr.effects) {
+      if (effect.is(clearHighlight)) {
+        return Decoration.none;
+      }
+
+      if (effect.is(addHighlight)) {
+        return effect.value;
+      }
+    }
+
+    return decorations;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
 export const CodeMirrorEditor = memo(
   ({
     id,
@@ -142,6 +170,9 @@ export const CodeMirrorEditor = memo(
     const onScrollRef = useRef(onScroll);
     const onChangeRef = useRef(onChange);
     const onSaveRef = useRef(onSave);
+
+    // useStore to subscribe to highlightedLine changes
+    const highlightedLine = useStore(workbenchStore.highlightedLine);
 
     /**
      * This effect is used to avoid side effects directly in the render function
@@ -253,6 +284,76 @@ export const CodeMirrorEditor = memo(
       );
     }, [doc?.value, editable, doc?.filePath, autoFocusOnDocumentChange]);
 
+    useEffect(() => {
+      if (!viewRef.current) {
+        return;
+      }
+
+      viewRef.current.dispatch({
+        effects: clearHighlight.of(null),
+      });
+
+      // highlightedLine is now directly from the store via useStore
+      console.log('DEBUG - CodeMirrorEditor - current doc path:', doc?.filePath);
+      console.log('DEBUG - CodeMirrorEditor - highlightedLine from useStore:', highlightedLine);
+
+      if (highlightedLine && doc?.filePath === highlightedLine.filePath) {
+        try {
+          const line = highlightedLine.line;
+          console.log('DEBUG - CodeMirrorEditor - attempting to highlight line:', line);
+
+          if (line < 0 || line >= viewRef.current.state.doc.lines) {
+            console.warn(
+              'DEBUG - CodeMirrorEditor - line out of range:',
+              line,
+              'max:',
+              viewRef.current.state.doc.lines
+            );
+            return;
+          }
+
+          const lineInfo = viewRef.current.state.doc.line(line + 1);
+          console.log('DEBUG - CodeMirrorEditor - lineInfo:', lineInfo);
+          
+          // create a more visible highlight with multiple decorations
+          const deco = Decoration.set([
+            // background highlight for the entire line
+            Decoration.line({
+              attributes: {
+                class: 'cm-debug-highlight-background',
+              },
+            }).range(lineInfo.from),
+            // text highlight
+            Decoration.mark({
+              attributes: {
+                class: 'cm-debug-highlight-text',
+              },
+            }).range(lineInfo.from, lineInfo.to),
+          ]);
+
+          // Apply highlight using the StateEffect
+          viewRef.current.dispatch({
+            effects: addHighlight.of(deco),
+            selection: { anchor: lineInfo.from },
+            scrollIntoView: true,
+          });
+
+          // ensure the line is truly visible by scheduling another scroll
+          setTimeout(() => {
+            if (viewRef.current) {
+              viewRef.current.dispatch({
+                scrollIntoView: true,
+                selection: { anchor: lineInfo.from },
+              });
+              console.log('DEBUG - CodeMirrorEditor - scrolled to line position:', lineInfo.from);
+            }
+          }, 100);
+        } catch (error) {
+          console.error('Error highlighting line:', error);
+        }
+      }
+    }, [doc?.filePath, highlightedLine]);
+
     return (
       <div className={classNames('relative h-full', className)}>
         {doc?.isBinary && <BinaryContent />}
@@ -355,6 +456,7 @@ function newEditorState(
           return icon;
         },
       }),
+      highlightField,
       ...extensions,
     ],
   });
