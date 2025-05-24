@@ -8,6 +8,7 @@ import { WORK_DIR } from '~/utils/constants';
 import { computeFileModifications } from '~/utils/diff';
 import { createScopedLogger } from '~/utils/logger';
 import { unreachable } from '~/utils/unreachable';
+import { proxySettingsStore } from './settings';
 
 const logger = createScopedLogger('FilesStore');
 
@@ -115,6 +116,18 @@ export class FilesStore {
 
   async #init() {
     const webcontainer = await this.#webcontainer;
+
+    proxySettingsStore.subscribe(async (proxySettings) => {
+      const { corsAuthToken, corsProxy } = proxySettings;
+
+      if (webcontainer) {
+        console.log('Applying WebContainer CORS Auth Token:', corsAuthToken ? 'configured' : 'not configured');
+        webcontainer.internal.setCORSAuthToken(corsAuthToken);
+
+        console.log('Applying WebContainer CORS Proxy:', corsProxy);
+        webcontainer.internal.setCORSProxy(corsProxy);
+      }
+    });
 
     webcontainer.internal.watchPaths(
       { include: [`${WORK_DIR}/**`], exclude: ['**/node_modules', '.git'], includeContent: true },
