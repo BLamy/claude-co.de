@@ -25,7 +25,7 @@ if (!import.meta.env.SSR) {
     import.meta.hot?.data.webcontainer ??
     Promise.resolve()
       .then(() => {
-        return WebContainer.boot({ workdirName: WORK_DIR_NAME });
+        return WebContainer.boot();
       })
       .then(async (webcontainer) => {
         webcontainerContext.loaded = true;

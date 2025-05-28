@@ -20,6 +20,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
   const [isExtractingUrl, setIsExtractingUrl] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [isTerminalReady, setIsTerminalReady] = useState(false);
+  const [loginCompletedData, setLoginCompletedData] = useState<{ userEmail: string | null; claudeConfig?: any } | null>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -108,6 +109,204 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
     }
   }, [isWebContainerReady, isTerminalReady, claudeLoginUrl, isExtractingUrl]);
 
+  // Handle login completion - send Enter keypresses and complete auth flow
+  useEffect(() => {
+    if (loginCompletedData && processRef.current && xtermRef.current) {
+      const sendEntersAndComplete = async () => {
+        console.log('[Auto] Login completed, sending Enter keypresses...');
+        
+        // Wait a moment for the process to be ready
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Send multiple Enter keypresses to complete the Claude Code flow
+        for (let i = 0; i < 5; i++) {
+          if (processRef.current) {
+            const writer = processRef.current.input.getWriter();
+            try {
+              await writer.write('\r');
+              console.log(`[Auto] Sent Enter ${i + 1}/5`);
+              
+              // Also show in terminal
+              if (xtermRef.current) {
+                xtermRef.current.write('\r\n');
+              }
+            } finally {
+              writer.releaseLock();
+            }
+            
+            // Wait between enters
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+        
+        console.log('[Auto] Finished sending Enter keypresses, waiting for file...');
+        
+        // Wait for the .claude.json file to be written
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Send Ctrl+C to exit Claude Code
+        console.log('[Auto] Sending Ctrl+C to exit Claude Code...');
+        if (processRef.current) {
+          const writer = processRef.current.input.getWriter();
+          try {
+            // Send Ctrl+C (ASCII code 3)
+            await writer.write('\x03');
+            console.log('[Auto] Ctrl+C sent');
+            
+            // Show in terminal
+            if (xtermRef.current) {
+              xtermRef.current.write('^C\r\n');
+            }
+          } finally {
+            writer.releaseLock();
+          }
+        }
+        
+        // Wait for process to exit
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Now run cat to verify the file exists
+        console.log('[Auto] Running cat ~/.claude.json to verify file...');
+        const instance = await webcontainer;
+        if (instance) {
+          try {
+            const catProcess = await instance.spawn('cat', ['/home/.claude.json']);
+            
+            // Show cat command in terminal
+            if (xtermRef.current) {
+              xtermRef.current.writeln('\r\n$ cat ~/.claude.json');
+            }
+            
+            // Capture and display the output
+            let jsonOutput = '';
+            catProcess.output.pipeTo(
+              new WritableStream({
+                write(data) {
+                  console.log('[Auto] cat output:', data);
+                  jsonOutput += data;
+                  if (xtermRef.current) {
+                    xtermRef.current.write(data);
+                  }
+                },
+              })
+            );
+
+            
+            const catExitCode = await catProcess.exit;
+            console.log('[Auto] cat command exited with code:', catExitCode);
+            
+            if (catExitCode === 0) {
+              console.log('[Auto] .claude.json file verified successfully');
+              console.log('[Auto] JSON output length:', jsonOutput.length);
+              
+              // Wrap everything in try-catch to see any errors
+              try {
+                // Parse the JSON output
+                const claudeConfig = JSON.parse(jsonOutput);
+                console.log('[Auto] Parsed claude.json successfully');
+                console.log('[Auto] User email from config:', claudeConfig.oauthAccount?.emailAddress);
+                console.log('[Auto] Primary API key exists:', !!claudeConfig.primaryApiKey);
+                
+                // Wait a bit before completing authentication
+                console.log('[Auto] Waiting before authentication...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Complete the authentication flow directly here with the parsed config
+                console.log('[Auto] About to call completeAuthenticationFlow...');
+                console.log('[Auto] Email param:', claudeConfig.oauthAccount?.emailAddress || loginCompletedData.userEmail);
+                console.log('[Auto] Config param exists:', !!claudeConfig);
+                
+                await completeAuthenticationFlow(
+                  claudeConfig.oauthAccount?.emailAddress || loginCompletedData.userEmail,
+                  claudeConfig
+                );
+                
+                console.log('[Auto] completeAuthenticationFlow returned successfully');
+              } catch (err) {
+                console.error('[Auto] Error in authentication flow:', err);
+                console.error('[Auto] Error stack:', err.stack);
+                console.error('[Auto] JSON output was:', jsonOutput.substring(0, 200) + '...');
+                
+                // Set error for user
+                setError('Authentication failed: ' + err.message);
+              }
+            } else {
+              console.error('[Auto] Failed to read .claude.json file');
+              
+              // Still try to complete authentication without the cat output
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              await completeAuthenticationFlow(loginCompletedData.userEmail, null);
+            }
+          } catch (err) {
+            console.error('[Auto] Error running cat command:', err);
+          }
+        }
+        
+        // Authentication flow is now handled inside the cat output parsing
+      };
+      
+      sendEntersAndComplete();
+    }
+  }, [loginCompletedData]);
+
+  const completeAuthenticationFlow = async (userEmail: string | null, claudeConfig?: any) => {
+    try {
+      console.log('[Auth] Completing authentication flow...');
+      console.log('[Auth] UserEmail:', userEmail);
+      console.log('[Auth] Has claudeConfig:', !!claudeConfig);
+      console.log('[Auth] onAuthenticate function exists:', typeof onAuthenticate);
+      
+      // Check if onAuthenticate exists
+      if (!onAuthenticate) {
+        throw new Error('onAuthenticate function not provided to LoginPage');
+      }
+      
+      // If we already have the config from cat, use it
+      if (claudeConfig) {
+        console.log('[Auth] Using Claude config from cat output');
+        console.log('[Auth] Email:', claudeConfig.oauthAccount?.emailAddress);
+        console.log('[Auth] Config keys:', Object.keys(claudeConfig));
+        
+        // Call the onAuthenticate function with the claude config as the auth code
+        // The AuthContext will handle WebAuthn setup
+        console.log('[Auth] Calling onAuthenticate with claude config...');
+        console.log('[Auth] Config string length:', JSON.stringify(claudeConfig).length);
+        
+        try {
+          await onAuthenticate({ 
+            type: 'claude', 
+            value: JSON.stringify(claudeConfig) // Pass the entire config as the "auth code"
+          });
+          console.log('[Auth] onAuthenticate completed successfully');
+        } catch (authErr) {
+          console.error('[Auth] onAuthenticate failed:', authErr);
+          console.error('[Auth] onAuthenticate error stack:', authErr.stack);
+          throw authErr;
+        }
+      } else {
+        // Fallback: read from file if we don't have the config
+        console.log('[Auth] Fallback: Reading ~/.claude.json file...');
+        
+        const instance = await webcontainer;
+        if (!instance) throw new Error('WebContainer not ready');
+
+        const claudeConfigContent = await instance.fs.readFile('/home/.claude.json', 'utf-8');
+        const config = JSON.parse(claudeConfigContent);
+        
+        console.log('[Auth] Claude config loaded from file');
+        
+        await onAuthenticate({ 
+          type: 'claude', 
+          value: JSON.stringify(config)
+        });
+      }
+      
+    } catch (err) {
+      console.error('[Auth] Failed to complete authentication flow:', err);
+      throw err;
+    }
+  };
+
   const extractClaudeLoginUrl = async () => {
     setIsExtractingUrl(true);
     // Don't auto-show terminal since it's automated
@@ -127,7 +326,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
       }
 
       // Run claude-code command
-      const process = await instance.spawn('npx', ['-y', '@anthropic-ai/claude-code']);
+      const process = await instance.spawn('npx', ['-y', '@anthropic-ai/claude-code@1.0.3']);
       processRef.current = process;
 
       // Connect process to terminal immediately
@@ -139,6 +338,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
         let themeSelected = false;
         let loginTypeSelected = false;
         let outputBuffer = '';
+        let waitingForAuthCode = false;
+        let loginCompleted = false;
 
         // Connect process output to terminal
         process.output.pipeTo(
@@ -169,7 +370,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                     
                     setTimeout(() => {
                       const writer2 = process.input.getWriter();
-                      writer2.write('\r').then(() => {
+                      writer2.write('\r\n').then(() => {
                         writer2.releaseLock();
                         console.log('[Auto] Sent: Enter');
                       });
@@ -197,7 +398,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                     
                     setTimeout(() => {
                       const writer2 = process.input.getWriter();
-                      writer2.write('\r').then(() => {
+                      writer2.write('\r\n').then(() => {
                         writer2.releaseLock();
                         console.log('[Auto] Sent: Enter');
                       });
@@ -212,6 +413,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                 const cleanUrl = urlMatch[0].replace(/[\x00-\x1F\x7F-\x9F]/g, '');
                 setClaudeLoginUrl(cleanUrl);
                 console.log('[Auto] Found login URL:', cleanUrl);
+              }
+
+              // Check if process is now waiting for auth code
+              if (data.includes('Paste code here') || data.includes('Enter code') || data.includes('authorization code')) {
+                waitingForAuthCode = true;
+                console.log('[Auto] Process is now waiting for authorization code');
+              }
+
+              // Check if login is completed
+              if (!loginCompleted && data.includes('Logged in as ')) {
+                loginCompleted = true;
+                console.log('[Auto] Login completed detected!');
+                
+                // Extract email from the "Logged in as" message
+                const emailMatch = data.match(/Logged in as ([^\s\r\n]+)/);
+                const userEmail = emailMatch ? emailMatch[1] : null;
+                console.log('[Auto] User email detected:', userEmail);
+                
+                // Set state to trigger Enter keypresses in the main component
+                setLoginCompletedData({ userEmail });
               }
             },
           })
@@ -292,8 +513,81 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
     setError(null);
     
     try {
-      await onAuthenticate({ type: 'claude', value: authCode });
+      // Send the auth code to the existing Claude Code process
+      if (processRef.current && xtermRef.current) {
+        // Show the terminal so user can see what's happening
+        setShowTerminal(true);
+        
+        console.log('[Auth] Sending authorization code to existing process...');
+        console.log('[Auth] Auth code (length:', authCode.length, '):', authCode);
+        console.log('[Auth] Process ref exists:', !!processRef.current);
+        console.log('[Auth] Terminal ref exists:', !!xtermRef.current);
+        
+        // Check if the process is still alive first
+        const processExitPromise = processRef.current.exit;
+        const processFinished = await Promise.race([
+          processExitPromise,
+          new Promise(resolve => setTimeout(() => resolve('still-running'), 100))
+        ]);
+        
+        if (processFinished !== 'still-running') {
+          throw new Error(`Process already exited with code: ${processFinished}`);
+        }
+        
+        console.log('[Auth] Process is still running, sending auth code...');
+        
+        console.log('[Auth] Manually triggering the terminal input handler...');
+        
+        // Directly call the terminal's onData handler with our auth code + enter
+        // This is the same handler that processes manual keyboard input
+        // Look at the terminal connection code around line 230 to see this handler
+        
+        // Send the auth code
+        console.log('[Auth] Triggering auth code input...');
+        
+        // Send each character to simulate typing
+        for (let i = 0; i < authCode.length; i++) {
+          // Find and call the terminal's input handler function directly
+          const char = authCode[i];
+          
+          // Get the writer and send the character (same as the onData handler does)
+          const writer = processRef.current.input.getWriter();
+          await writer.write(char);
+          writer.releaseLock();
+          
+          // Also display it in the terminal
+          xtermRef.current.write(char);
+          
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        
+        console.log('[Auth] Auth code sent, now sending Enter...');
+        
+        // Send Enter
+        const writer = processRef.current.input.getWriter();
+        await writer.write('\r');
+        writer.releaseLock();
+        
+        // Also display Enter in terminal
+        xtermRef.current.write('\r\n');
+        
+        console.log('[Auth] Enter sent');
+        
+        // Wait for the process to complete authentication
+        console.log('[Auth] Waiting for authentication to complete...');
+        const exitCode = await processRef.current.exit;
+        
+        if (exitCode === 0) {
+          // Authentication successful, now call onAuthenticate to complete the flow
+          await onAuthenticate({ type: 'claude', value: authCode });
+        } else {
+          throw new Error(`Authentication failed with exit code ${exitCode}`);
+        }
+      } else {
+        throw new Error('No active Claude Code process found');
+      }
     } catch (err) {
+      console.error('Auth code submission failed:', err);
       setError('Failed to authenticate with authorization code');
       setIsLoading(false);
     }
