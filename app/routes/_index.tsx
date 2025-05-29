@@ -1,11 +1,9 @@
 import { json, type MetaFunction } from '@remix-run/cloudflare';
 import { ClientOnly } from 'remix-utils/client-only';
-import { BaseChat } from '~/components/chat/BaseChat';
-import { Chat } from '~/components/chat/Chat.client';
-import { Header } from '~/components/header/Header';
+import { Workbench } from '~/components/workbench/Workbench.client';
 
 export const meta: MetaFunction = () => {
-  return [{ title: 'Bolt' }, { name: 'description', content: 'Talk with Bolt, an AI assistant from StackBlitz' }];
+  return [{ title: 'Bolt' }, { name: 'description', content: 'Development Environment' }];
 };
 
 export const loader = () => json({});
@@ -13,8 +11,9 @@ export const loader = () => json({});
 export default function Index() {
   return (
     <div className="flex flex-col h-full w-full">
-      <Header />
-      <ClientOnly fallback={<BaseChat />}>{() => <Chat />}</ClientOnly>
+      <ClientOnly fallback={<div>Loading...</div>}>
+        {() => <Workbench chatStarted={true} />}
+      </ClientOnly>
     </div>
   );
 }

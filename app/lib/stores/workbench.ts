@@ -33,7 +33,7 @@ export class WorkbenchStore {
 
   artifacts: Artifacts = import.meta.hot?.data.artifacts ?? map({});
 
-  showWorkbench: WritableAtom<boolean> = import.meta.hot?.data.showWorkbench ?? atom(false);
+  showWorkbench: WritableAtom<boolean> = import.meta.hot?.data.showWorkbench ?? atom(true);
   currentView: WritableAtom<WorkbenchViewType> = import.meta.hot?.data.currentView ?? atom('code');
   unsavedFiles: WritableAtom<Set<string>> = import.meta.hot?.data.unsavedFiles ?? atom(new Set<string>());
   modifiedFiles = new Set<string>();
