@@ -18,7 +18,7 @@ export class TerminalStore {
   #terminals: Array<{ terminal: ITerminal; process: WebContainerProcess }> = [];
   #terminalIdCounter = 0;
 
-  showTerminal: WritableAtom<boolean> = import.meta.hot?.data.showTerminal ?? atom(false);
+  showTerminal: WritableAtom<boolean> = import.meta.hot?.data.showTerminal ?? atom(true);
   terminalInfo: MapStore<Record<string, TerminalInfo>> = import.meta.hot?.data.terminalInfo ?? map({});
   activeTerminalId: WritableAtom<string> = import.meta.hot?.data.activeTerminalId ?? atom('terminal-0');
 
@@ -31,9 +31,9 @@ export class TerminalStore {
       import.meta.hot.data.activeTerminalId = this.activeTerminalId;
     }
 
-    // Initialize with one default terminal
+    // Initialize with one default Claude terminal
     if (Object.keys(this.terminalInfo.get()).length === 0) {
-      this.createTerminal();
+      this.createTerminal(true);
     }
   }
 

@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react';
 import { motion, type HTMLMotionProps, type Variants } from 'framer-motion';
 import { computed } from 'nanostores';
 import { memo, useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import useResizeObserver from 'use-resize-observer';
 import { toast } from 'react-toastify';
 import {
   type OnChangeCallback as OnEditorChange,
@@ -78,7 +79,7 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
 
   const [activeSidebarPanel, setActiveSidebarPanel] = useState<'files' | 'tests' | 'search'>('files');
   const [isWide, setIsWide] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const { ref: containerRef, width: containerWidth = 0 } = useResizeObserver<HTMLDivElement>();
 
   // terminal state
   const terminalRefs = useRef<Record<string, TerminalRef | null>>({});
@@ -105,16 +106,9 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
   }, [files]);
 
   useEffect(() => {
-    const handleResize = () => {
-      if (containerRef.current) {
-        setIsWide(containerRef.current.offsetWidth > 900);
-      }
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    console.log('Container width:', containerWidth, 'Window width:', window.innerWidth);
+    setIsWide(containerWidth > 900);
+  }, [containerWidth]);
 
   useEffect(() => {
     const { current: terminal } = terminalPanelRef;
@@ -317,31 +311,16 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
                 {!isWide && <Slider selected={selectedView} options={sliderOptions} setSelected={setSelectedView} />}
                 <div className="ml-auto" />
                 {(selectedView === 'code' || isWide) && (
-                  <>
-                    <PanelHeaderButton
-                      className="mr-1 text-sm"
-                      onClick={() => {
-                        workbenchStore.toggleTerminal(!workbenchStore.showTerminal.get());
-                      }}
-                    >
-                      <div className="i-ph:terminal" />
-                      Toggle Terminal
-                    </PanelHeaderButton>
-
-                    <PanelHeaderButton className="mr-1 text-sm" onClick={() => toggleSidebarPanel('tests')}>
-                      <div className="i-ph:bug" />
-                      Test Explorer
-                    </PanelHeaderButton>
-                  </>
+                  <PanelHeaderButton
+                    className="mr-1 text-sm"
+                    onClick={() => {
+                      workbenchStore.toggleTerminal(!workbenchStore.showTerminal.get());
+                    }}
+                  >
+                    <div className="i-ph:terminal" />
+                    Toggle Terminal
+                  </PanelHeaderButton>
                 )}
-                <IconButton
-                  icon="i-ph:x-circle"
-                  className="-mr-1"
-                  size="xl"
-                  onClick={() => {
-                    workbenchStore.showWorkbench.set(false);
-                  }}
-                />
               </div>
               <div className="relative flex-1 overflow-hidden">
                 <div className="h-full flex">

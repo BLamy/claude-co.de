@@ -717,7 +717,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                 <button
                   type="button"
                   onClick={() => setShowTerminal(!showTerminal)}
-                  className="w-full text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2 px-4 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white border border-gray-300 dark:border-gray-600 rounded-lg transition-all flex items-center justify-center gap-2"
                 >
                   <svg
                     className={`w-4 h-4 transition-transform ${showTerminal ? 'rotate-180' : ''}`}
