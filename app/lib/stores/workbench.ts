@@ -76,12 +76,32 @@ export class WorkbenchStore {
     return this.#terminalStore.showTerminal;
   }
 
+  get terminalInfo() {
+    return this.#terminalStore.terminalInfo;
+  }
+
+  get activeTerminalId() {
+    return this.#terminalStore.activeTerminalId;
+  }
+
   toggleTerminal(value?: boolean) {
     this.#terminalStore.toggleTerminal(value);
   }
 
-  attachTerminal(terminal: ITerminal, initialCommand?: string) {
-    this.#terminalStore.attachTerminal(terminal, initialCommand);
+  createTerminal(isClaude = false, command?: string): string {
+    return this.#terminalStore.createTerminal(isClaude, command);
+  }
+
+  attachTerminal(terminalId: string, terminal: ITerminal) {
+    this.#terminalStore.attachTerminal(terminalId, terminal);
+  }
+
+  setActiveTerminal(terminalId: string) {
+    this.#terminalStore.setActiveTerminal(terminalId);
+  }
+
+  getTerminalCount(): number {
+    return this.#terminalStore.getTerminalCount();
   }
 
   onTerminalResize(cols: number, rows: number) {

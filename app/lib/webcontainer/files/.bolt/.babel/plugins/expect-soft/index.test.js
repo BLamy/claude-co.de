@@ -8,7 +8,7 @@ function transform(source) {
     plugins: [expectSoft],
     babelrc: false,
     configFile: false,
-    parserOpts: { sourceType: 'script' }
+    parserOpts: { sourceType: 'script' },
   });
   return code;
 }
@@ -56,8 +56,10 @@ describe('babel-plugin-vitest-soft-expect', () => {
   it('handles nested expect calls properly', () => {
     const source = 'expect(expect(value).toBe(true)).not.toThrow();';
     const result = transform(source);
+
     // Outer expect should be transformed
     expect(result).toMatch(/expect\.soft\(.*\)\.not\.toThrow\(\);/);
+
     // Inner expect should also be transformed
     expect(result).toMatch(/expect\.soft\(value\)\.toBe\(true\)/);
   });
@@ -67,10 +69,10 @@ describe('babel-plugin-vitest-soft-expect', () => {
     const result = transform(source);
     expect(result).toContain('expect.soft(value)');
   });
-  
+
   it('transforms expect in function declarations', () => {
     const source = 'function test() { expect(value).toBe(true); }';
     const result = transform(source);
     expect(result).toContain('expect.soft(value)');
   });
-}); 
+});

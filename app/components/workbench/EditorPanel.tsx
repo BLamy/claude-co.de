@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels';
 import {
   CodeMirrorEditor,
@@ -35,8 +35,8 @@ interface EditorPanelProps {
   onFileSelect?: (value?: string) => void;
   onFileSave?: OnEditorSave;
   onFileReset?: () => void;
-  sidebarMode?: boolean;
   hideFileExplorer?: boolean;
+  hideTerminal?: boolean;
 }
 
 const MAX_TERMINALS = 3;
@@ -57,23 +57,21 @@ export const EditorPanel = memo(
     onEditorScroll,
     onFileSave,
     onFileReset,
-    sidebarMode,
     hideFileExplorer,
+    hideTerminal,
   }: EditorPanelProps) => {
     renderLogger.trace('EditorPanel');
 
     const theme = useStore(themeStore);
     const showTerminal = useStore(workbenchStore.showTerminal);
 
-    const terminalRefs = useRef<Array<TerminalRef | null>>([]);
+    const terminalRefs = useRef<Record<string, TerminalRef | null>>({});
     const terminalPanelRef = useRef<ImperativePanelHandle>(null);
     const terminalToggledByShortcut = useRef(false);
 
-    const [activeTerminal, setActiveTerminal] = useState(0);
-    const [terminalCount, setTerminalCount] = useState(1);
-    const [terminalCommands, setTerminalCommands] = useState<Record<number, string>>({});
-    const [claudeTerminals, setClaudeTerminals] = useState<Set<number>>(new Set());
-    const [runningClaudeTerminals, setRunningClaudeTerminals] = useState<Set<number>>(new Set());
+    const terminalInfo = useStore(workbenchStore.terminalInfo);
+    const activeTerminalId = useStore(workbenchStore.activeTerminalId);
+    const terminalKeys = Object.keys(terminalInfo);
 
     const activeFileSegments = useMemo(() => {
       if (!editorDocument) {
@@ -123,114 +121,77 @@ export const EditorPanel = memo(
     }, [showTerminal]);
 
     const addTerminal = () => {
-      if (terminalCount < MAX_TERMINALS) {
-        setTerminalCount(terminalCount + 1);
-        setActiveTerminal(terminalCount);
+      if (workbenchStore.getTerminalCount() < MAX_TERMINALS) {
+        const newId = workbenchStore.createTerminal();
+        workbenchStore.setActiveTerminal(newId);
       }
     };
 
     const addClaudeTerminal = () => {
-      if (terminalCount < MAX_TERMINALS) {
-        const newIndex = terminalCount;
-        setTerminalCount(terminalCount + 1);
-        setActiveTerminal(newIndex);
-
-        // Store the command for this terminal
-        setTerminalCommands((prev) => ({
-          ...prev,
-          [newIndex]: 'npx -y @anthropic-ai/claude-code@1.0.3',
-        }));
-
-        // Mark this as a Claude terminal
-        setClaudeTerminals((prev) => new Set(prev).add(newIndex));
-
-        // Mark it as running initially
-        setRunningClaudeTerminals((prev) => new Set(prev).add(newIndex));
-
-        // After a delay, mark it as no longer running (Claude Code is interactive but starts quickly)
-        setTimeout(() => {
-          setRunningClaudeTerminals((prev) => {
-            const newSet = new Set(prev);
-            newSet.delete(newIndex);
-
-            return newSet;
-          });
-        }, 5000); // 5 seconds should be enough for Claude Code to start
+      if (workbenchStore.getTerminalCount() < MAX_TERMINALS) {
+        const newId = workbenchStore.createTerminal(true);
+        workbenchStore.setActiveTerminal(newId);
       }
     };
 
     return (
       <PanelGroup direction="vertical">
         <Panel defaultSize={showTerminal ? DEFAULT_EDITOR_SIZE : 100} minSize={20}>
-          {sidebarMode ? (
-            <div className="flex flex-col h-full">
-              <FileTree
-                className="h-full"
-                files={files}
-                hideRoot
-                unsavedFiles={unsavedFiles}
-                rootFolder={WORK_DIR}
-                selectedFile={selectedFile}
-                onFileSelect={onFileSelect}
-              />
-            </div>
-          ) : (
-            <PanelGroup direction="horizontal">
-              {!hideFileExplorer && (
-                <>
-                  <Panel defaultSize={20} minSize={10} collapsible>
-                    <div className="flex flex-col border-r border-bolt-elements-borderColor h-full">
-                      <FileTree
-                        className="h-full"
-                        files={files}
-                        hideRoot
-                        unsavedFiles={unsavedFiles}
-                        rootFolder={WORK_DIR}
-                        selectedFile={selectedFile}
-                        onFileSelect={onFileSelect}
-                      />
-                    </div>
-                  </Panel>
-                  <PanelResizeHandle />
-                </>
-              )}
-              <Panel className="flex flex-col" defaultSize={hideFileExplorer ? 100 : 80} minSize={20}>
-                <PanelHeader className="overflow-x-auto">
-                  {activeFileSegments?.length && (
-                    <div className="flex items-center flex-1 text-sm">
-                      <FileBreadcrumb pathSegments={activeFileSegments} files={files} onFileSelect={onFileSelect} />
-                      {activeFileUnsaved && (
-                        <div className="flex gap-1 ml-auto -mr-1.5">
-                          <PanelHeaderButton onClick={onFileSave}>
-                            <div className="i-ph:floppy-disk-duotone" />
-                            Save
-                          </PanelHeaderButton>
-                          <PanelHeaderButton onClick={onFileReset}>
-                            <div className="i-ph:clock-counter-clockwise-duotone" />
-                            Reset
-                          </PanelHeaderButton>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </PanelHeader>
-                <div className="h-full flex-1 overflow-hidden">
-                  <CodeMirrorEditor
-                    theme={theme}
-                    editable={!isStreaming && editorDocument !== undefined}
-                    settings={editorSettings}
-                    doc={editorDocument}
-                    autoFocusOnDocumentChange={!isMobile()}
-                    onScroll={onEditorScroll}
-                    onChange={onEditorChange}
-                    onSave={onFileSave}
-                  />
-                </div>
-              </Panel>
-            </PanelGroup>
-          )}
+          <PanelGroup direction="horizontal">
+            {!hideFileExplorer && (
+              <>
+                <Panel defaultSize={20} minSize={10} collapsible>
+                  <div className="flex flex-col border-r border-bolt-elements-borderColor h-full">
+                    <FileTree
+                      className="h-full"
+                      files={files}
+                      hideRoot
+                      unsavedFiles={unsavedFiles}
+                      rootFolder={WORK_DIR}
+                      selectedFile={selectedFile}
+                      onFileSelect={onFileSelect}
+                    />
+                  </div>
+                </Panel>
+                <PanelResizeHandle />
+              </>
+            )}
+            <Panel className="flex flex-col" defaultSize={hideFileExplorer ? 100 : 80} minSize={20}>
+              <PanelHeader className="overflow-x-auto">
+                {activeFileSegments?.length && (
+                  <div className="flex items-center flex-1 text-sm">
+                    <FileBreadcrumb pathSegments={activeFileSegments} files={files} onFileSelect={onFileSelect} />
+                    {activeFileUnsaved && (
+                      <div className="flex gap-1 ml-auto -mr-1.5">
+                        <PanelHeaderButton onClick={onFileSave}>
+                          <div className="i-ph:floppy-disk-duotone" />
+                          Save
+                        </PanelHeaderButton>
+                        <PanelHeaderButton onClick={onFileReset}>
+                          <div className="i-ph:clock-counter-clockwise-duotone" />
+                          Reset
+                        </PanelHeaderButton>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </PanelHeader>
+              <div className="h-full flex-1 overflow-hidden">
+                <CodeMirrorEditor
+                  theme={theme}
+                  editable={!isStreaming && editorDocument !== undefined}
+                  settings={editorSettings}
+                  doc={editorDocument}
+                  autoFocusOnDocumentChange={!isMobile()}
+                  onScroll={onEditorScroll}
+                  onChange={onEditorChange}
+                  onSave={onFileSave}
+                />
+              </div>
+            </Panel>
+          </PanelGroup>
         </Panel>
-        {!sidebarMode && (
+        {!hideTerminal && (
           <>
             <PanelResizeHandle />
             <Panel
@@ -252,15 +213,15 @@ export const EditorPanel = memo(
               <div className="h-full">
                 <div className="bg-bolt-elements-terminals-background h-full flex flex-col">
                   <div className="flex items-center bg-bolt-elements-background-depth-2 border-y border-bolt-elements-borderColor gap-1.5 min-h-[34px] p-2">
-                    {Array.from({ length: terminalCount }, (_, index) => {
-                      const isActive = activeTerminal === index;
-
-                      const isClaude = claudeTerminals.has(index);
-                      const isClaudeRunning = runningClaudeTerminals.has(index);
+                    {terminalKeys.map((terminalId) => {
+                      const info = terminalInfo[terminalId];
+                      const isActive = activeTerminalId === terminalId;
+                      const isClaude = info.isClaude;
+                      const isClaudeRunning = info.isRunning;
 
                       return (
                         <button
-                          key={index}
+                          key={terminalId}
                           className={classNames(
                             'flex items-center text-sm cursor-pointer gap-1.5 px-3 py-2 h-full whitespace-nowrap rounded-full',
                             {
@@ -269,7 +230,7 @@ export const EditorPanel = memo(
                                 !isActive,
                             },
                           )}
-                          onClick={() => setActiveTerminal(index)}
+                          onClick={() => workbenchStore.setActiveTerminal(terminalId)}
                         >
                           {isClaude ? (
                             <div className="relative">
@@ -279,7 +240,7 @@ export const EditorPanel = memo(
                                 viewBox="0 0 24 24"
                                 xmlns="http://www.w3.org/2000/svg"
                                 className={classNames('flex-shrink-0', {
-                                  'animate-pulse': isClaudeRunning,
+                                  'animate-pulse': !!isClaudeRunning,
                                 })}
                               >
                                 <path
@@ -295,12 +256,14 @@ export const EditorPanel = memo(
                             <div className="i-ph:terminal-window-duotone text-lg" />
                           )}
                           {isClaude ? (isClaudeRunning ? 'Claude (Running)' : 'Claude') : 'Terminal'}{' '}
-                          {terminalCount > 1 && index + 1}
+                          {terminalKeys.length > 1 && terminalKeys.indexOf(terminalId) + 1}
                         </button>
                       );
                     })}
-                    {terminalCount < MAX_TERMINALS && <IconButton icon="i-ph:plus" size="md" onClick={addTerminal} />}
-                    {terminalCount < MAX_TERMINALS && (
+                    {terminalKeys.length < MAX_TERMINALS && (
+                      <IconButton icon="i-ph:plus" size="md" onClick={addTerminal} />
+                    )}
+                    {terminalKeys.length < MAX_TERMINALS && (
                       <IconButton size="md" onClick={addClaudeTerminal} title="Open Claude Code Terminal">
                         <svg
                           height="1em"
@@ -325,20 +288,19 @@ export const EditorPanel = memo(
                       onClick={() => workbenchStore.toggleTerminal(false)}
                     />
                   </div>
-                  {Array.from({ length: terminalCount }, (_, index) => {
-                    const isActive = activeTerminal === index;
+                  {terminalKeys.map((terminalId) => {
+                    const isActive = activeTerminalId === terminalId;
 
                     return (
                       <Terminal
-                        key={index}
+                        key={terminalId}
                         className={classNames('h-full overflow-hidden', {
                           hidden: !isActive,
                         })}
                         ref={(ref) => {
-                          terminalRefs.current[index] = ref;
+                          terminalRefs.current[terminalId] = ref;
                         }}
-                        initialCommand={terminalCommands[index]}
-                        onTerminalReady={(terminal) => workbenchStore.attachTerminal(terminal, terminalCommands[index])}
+                        onTerminalReady={(terminal) => workbenchStore.attachTerminal(terminalId, terminal)}
                         onTerminalResize={(cols, rows) => workbenchStore.onTerminalResize(cols, rows)}
                         theme={theme}
                       />

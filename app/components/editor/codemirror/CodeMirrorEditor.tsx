@@ -307,14 +307,14 @@ export const CodeMirrorEditor = memo(
               'DEBUG - CodeMirrorEditor - line out of range:',
               line,
               'max:',
-              viewRef.current.state.doc.lines
+              viewRef.current.state.doc.lines,
             );
             return;
           }
 
           const lineInfo = viewRef.current.state.doc.line(line + 1);
           console.log('DEBUG - CodeMirrorEditor - lineInfo:', lineInfo);
-          
+
           // create a more visible highlight with multiple decorations
           const deco = Decoration.set([
             // background highlight for the entire line
@@ -323,6 +323,7 @@ export const CodeMirrorEditor = memo(
                 class: 'cm-debug-highlight-background',
               },
             }).range(lineInfo.from),
+
             // text highlight
             Decoration.mark({
               attributes: {

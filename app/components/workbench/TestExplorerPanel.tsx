@@ -7,11 +7,26 @@ import '~/styles/components/editor.scss';
 
 // Helper formatter for variable display
 const formatVal = (v: unknown) => {
-  if (v === undefined) return <span className="text-gray-400">undefined</span>;
-  if (v === null) return <span className="text-gray-400">null</span>;
-  if (typeof v === 'boolean') return <span className="text-blue-400">{String(v)}</span>;
-  if (typeof v === 'number') return <span className="text-green-400">{v}</span>;
-  if (typeof v === 'string') return <span className="text-orange-400">"{v}"</span>;
+  if (v === undefined) {
+    return <span className="text-gray-400">undefined</span>;
+  }
+
+  if (v === null) {
+    return <span className="text-gray-400">null</span>;
+  }
+
+  if (typeof v === 'boolean') {
+    return <span className="text-blue-400">{String(v)}</span>;
+  }
+
+  if (typeof v === 'number') {
+    return <span className="text-green-400">{v}</span>;
+  }
+
+  if (typeof v === 'string') {
+    return <span className="text-orange-400">"{v}"</span>;
+  }
+
   return <span className="text-purple-400">{JSON.stringify(v)}</span>;
 };
 
@@ -23,21 +38,17 @@ interface TestListProps {
 const TestList = memo(({ tests = {}, onSelect }: TestListProps) => (
   <div className="h-full overflow-y-auto text-[13px]">
     {Object.entries(tests).length === 0 && (
-      <div className="p-4 text-gray-500 text-center">
-        No tests with debug data.
-      </div>
+      <div className="p-4 text-gray-500 text-center">No tests with debug data.</div>
     )}
     <ul>
-    {Object.entries(tests).map(([name, steps]) => (
+      {Object.entries(tests).map(([name, steps]) => (
         <li
           key={name}
           className="debug-test-item flex justify-between px-4 py-1 hover:bg-[#2a2d2e] cursor-pointer"
           onClick={() => onSelect(Object.values(steps))}
         >
           <span className="test-name flex-1">{name}</span>
-          <span className="test-steps text-xs text-[#888]">
-            {Object.values(steps).length} steps
-          </span>
+          <span className="test-steps text-xs text-[#888]">{Object.values(steps).length} steps</span>
         </li>
       ))}
     </ul>
@@ -65,14 +76,11 @@ const DebuggerPanel = memo(({ steps, currentStepIndex, onStepSelect }: DebuggerP
     <div className="flex flex-col h-full overflow-hidden">
       {/* Controls */}
       <div className="flex items-center gap-2 px-3 py-2 bg-bolt-elements-background-depth-1 border-b border-bolt-elements-borderColor text-sm">
-        <button 
-          className="p-1 hover:bg-bolt-elements-background-depth-3 rounded" 
-          onClick={() => onStepSelect(0)}
-        >
+        <button className="p-1 hover:bg-bolt-elements-background-depth-3 rounded" onClick={() => onStepSelect(0)}>
           ⏮️
         </button>
-        <button 
-          className="p-1 hover:bg-bolt-elements-background-depth-3 rounded" 
+        <button
+          className="p-1 hover:bg-bolt-elements-background-depth-3 rounded"
           onClick={() => onStepSelect(Math.max(0, currentStepIndex - 1))}
         >
           ◀️
@@ -80,14 +88,14 @@ const DebuggerPanel = memo(({ steps, currentStepIndex, onStepSelect }: DebuggerP
         <div className="flex-1 text-center text-xs">
           Step {currentStepIndex + 1}/{steps.length}
         </div>
-        <button 
-          className="p-1 hover:bg-bolt-elements-background-depth-3 rounded" 
+        <button
+          className="p-1 hover:bg-bolt-elements-background-depth-3 rounded"
           onClick={() => onStepSelect(Math.min(steps.length - 1, currentStepIndex + 1))}
         >
           ▶️
         </button>
-        <button 
-          className="p-1 hover:bg-bolt-elements-background-depth-3 rounded" 
+        <button
+          className="p-1 hover:bg-bolt-elements-background-depth-3 rounded"
           onClick={() => onStepSelect(steps.length - 1)}
         >
           ⏭️
@@ -101,9 +109,7 @@ const DebuggerPanel = memo(({ steps, currentStepIndex, onStepSelect }: DebuggerP
             <div
               key={i}
               className={`flex-1 h-full cursor-pointer ${
-                i === currentStepIndex 
-                  ? 'bg-bolt-brand' 
-                  : 'bg-transparent hover:bg-bolt-elements-background-depth-2'
+                i === currentStepIndex ? 'bg-bolt-brand' : 'bg-transparent hover:bg-bolt-elements-background-depth-2'
               }`}
               onClick={() => onStepSelect(i)}
             />
@@ -116,9 +122,8 @@ const DebuggerPanel = memo(({ steps, currentStepIndex, onStepSelect }: DebuggerP
         {currentStep?.vars ? (
           Object.entries(currentStep.vars).map(([key, value]) => {
             const prevValue = currentStepIndex > 0 && steps[currentStepIndex - 1]?.vars?.[key];
-            const hasChanged = prevValue !== undefined && 
-              JSON.stringify(prevValue) !== JSON.stringify(value);
-            
+            const hasChanged = prevValue !== undefined && JSON.stringify(prevValue) !== JSON.stringify(value);
+
             return (
               <div
                 key={key}
@@ -132,26 +137,16 @@ const DebuggerPanel = memo(({ steps, currentStepIndex, onStepSelect }: DebuggerP
             );
           })
         ) : (
-          <div className="p-4 text-bolt-elements-textSecondary">
-            No variables for this step
-          </div>
+          <div className="p-4 text-bolt-elements-textSecondary">No variables for this step</div>
         )}
       </div>
       <div className="flex-1 overflow-y-auto">
         {currentStep?.file && (
           <div className="px-3 py-2 border-b border-bolt-elements-borderColor">
-            <div className="text-sm text-bolt-elements-textSecondary mb-1">
-              File:
-            </div>
-            <div className="font-mono text-sm truncate">
-              {currentStep.file.split('/').pop()}
-            </div>
-            <div className="text-sm text-bolt-elements-textSecondary mt-2 mb-1">
-              Line:
-            </div>
-            <div className="font-mono text-sm">
-              {currentStep.line}
-            </div>
+            <div className="text-sm text-bolt-elements-textSecondary mb-1">File:</div>
+            <div className="font-mono text-sm truncate">{currentStep.file.split('/').pop()}</div>
+            <div className="text-sm text-bolt-elements-textSecondary mt-2 mb-1">Line:</div>
+            <div className="font-mono text-sm">{currentStep.line}</div>
           </div>
         )}
       </div>
@@ -206,27 +201,19 @@ export const TestExplorerPanel = memo(() => {
             Back to Tests
           </PanelHeaderButton>
         )}
-        
-        <div className="flex-1 font-medium">
-          {view === 'tests' ? 'Test Explorer' : 'Test Debugger'}
-        </div>
-        
-        <PanelHeaderButton 
-          onClick={handleRunTests} 
-          className="text-sm"
-        >
+
+        <div className="flex-1 font-medium">{view === 'tests' ? 'Test Explorer' : 'Test Debugger'}</div>
+
+        <PanelHeaderButton onClick={handleRunTests} className="text-sm">
           <div className="i-ph:play" />
           Run Tests
         </PanelHeaderButton>
       </div>
 
       {/* Status Bar */}
-      <div 
-        className="flex items-center h-[24px] text-xs px-3" 
-        style={{ background: testStatus.color }}
-      >
+      <div className="flex items-center h-[24px] text-xs px-3" style={{ background: testStatus.color }}>
         <div className="flex flex-1 items-center gap-2">
-          <span 
+          <span
             className="w-2 h-2 rounded-full"
             style={{ background: testStatus.color === '#007acc' ? '#3BB446' : testStatus.color }}
           />
@@ -244,10 +231,7 @@ export const TestExplorerPanel = memo(() => {
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
         {view === 'tests' ? (
-          <TestList 
-            tests={testSuites} 
-            onSelect={handleSelectTest}
-          />
+          <TestList tests={testSuites} onSelect={handleSelectTest} />
         ) : (
           <DebuggerPanel
             steps={selectedTestSteps}
@@ -258,4 +242,4 @@ export const TestExplorerPanel = memo(() => {
       </div>
     </div>
   );
-}); 
+});

@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { motion, type HTMLMotionProps, type Variants } from 'framer-motion';
 import { computed } from 'nanostores';
-import { memo, useCallback, useEffect, useState, useRef } from 'react';
+import { memo, useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import {
   type OnChangeCallback as OnEditorChange,
@@ -18,6 +18,7 @@ import { renderLogger } from '~/utils/logger';
 import { EditorPanel } from './EditorPanel';
 import { Preview } from './Preview';
 import { TestExplorerPanel } from './TestExplorerPanel';
+import { SearchPanel } from './SearchPanel';
 import { FileTree } from './FileTree';
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels';
 import { themeStore } from '~/lib/stores/theme';
@@ -75,19 +76,17 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
   const showTerminal = useStore(workbenchStore.showTerminal);
   const theme = useStore(themeStore);
 
-  const [activeSidebarPanel, setActiveSidebarPanel] = useState<'files' | 'tests'>('files');
+  const [activeSidebarPanel, setActiveSidebarPanel] = useState<'files' | 'tests' | 'search'>('files');
   const [isWide, setIsWide] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Terminal state for wide mode
-  const terminalRefs = useRef<Array<TerminalRef | null>>([]);
+  // terminal state
+  const terminalRefs = useRef<Record<string, TerminalRef | null>>({});
   const terminalPanelRef = useRef<ImperativePanelHandle>(null);
   const terminalToggledByShortcut = useRef(false);
-  const [activeTerminal, setActiveTerminal] = useState(0);
-  const [terminalCount, setTerminalCount] = useState(1);
-  const [terminalCommands, setTerminalCommands] = useState<Record<number, string>>({});
-  const [claudeTerminals, setClaudeTerminals] = useState<Set<number>>(new Set());
-  const [runningClaudeTerminals, setRunningClaudeTerminals] = useState<Set<number>>(new Set());
+  const terminalInfo = useStore(workbenchStore.terminalInfo);
+  const activeTerminalId = useStore(workbenchStore.activeTerminalId);
+  const terminalKeys = useMemo(() => Object.keys(terminalInfo), [terminalInfo]);
 
   const setSelectedView = (view: WorkbenchViewType) => {
     workbenchStore.currentView.set(view);
@@ -157,44 +156,21 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
     workbenchStore.resetCurrentDocument();
   }, []);
 
-  const toggleSidebarPanel = useCallback((panel: 'files' | 'tests') => {
+  const toggleSidebarPanel = useCallback((panel: 'files' | 'tests' | 'search') => {
     setActiveSidebarPanel(panel);
   }, []);
 
   const addTerminal = () => {
-    if (terminalCount < MAX_TERMINALS) {
-      setTerminalCount(terminalCount + 1);
-      setActiveTerminal(terminalCount);
+    if (workbenchStore.getTerminalCount() < MAX_TERMINALS) {
+      const newId = workbenchStore.createTerminal();
+      workbenchStore.setActiveTerminal(newId);
     }
   };
 
   const addClaudeTerminal = () => {
-    if (terminalCount < MAX_TERMINALS) {
-      const newIndex = terminalCount;
-      setTerminalCount(terminalCount + 1);
-      setActiveTerminal(newIndex);
-
-      // store the command for this terminal
-      setTerminalCommands((prev) => ({
-        ...prev,
-        [newIndex]: 'npx -y @anthropic-ai/claude-code@1.0.3',
-      }));
-
-      // mark this as a Claude terminal
-      setClaudeTerminals((prev) => new Set(prev).add(newIndex));
-
-      // mark it as running initially
-      setRunningClaudeTerminals((prev) => new Set(prev).add(newIndex));
-
-      // after a delay, mark it as no longer running (Claude Code is interactive but starts quickly)
-      setTimeout(() => {
-        setRunningClaudeTerminals((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(newIndex);
-
-          return newSet;
-        });
-      }, 5000); // 5 seconds should be enough for Claude Code to start
+    if (workbenchStore.getTerminalCount() < MAX_TERMINALS) {
+      const newId = workbenchStore.createTerminal(true);
+      workbenchStore.setActiveTerminal(newId);
     }
   };
 
@@ -220,14 +196,15 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
         <div className="h-full">
           <div className="bg-bolt-elements-terminals-background h-full flex flex-col">
             <div className="flex items-center bg-bolt-elements-background-depth-2 border-y border-bolt-elements-borderColor gap-1.5 min-h-[34px] p-2">
-              {Array.from({ length: terminalCount }, (_, index) => {
-                const isActive = activeTerminal === index;
-                const isClaude = claudeTerminals.has(index);
-                const isClaudeRunning = runningClaudeTerminals.has(index);
+              {terminalKeys.map((terminalId) => {
+                const info = terminalInfo[terminalId];
+                const isActive = activeTerminalId === terminalId;
+                const isClaude = info.isClaude;
+                const isClaudeRunning = info.isRunning;
 
                 return (
                   <button
-                    key={index}
+                    key={terminalId}
                     className={classNames(
                       'flex items-center text-sm cursor-pointer gap-1.5 px-3 py-2 h-full whitespace-nowrap rounded-full',
                       {
@@ -236,7 +213,7 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
                           !isActive,
                       },
                     )}
-                    onClick={() => setActiveTerminal(index)}
+                    onClick={() => workbenchStore.setActiveTerminal(terminalId)}
                   >
                     {isClaude ? (
                       <div className="relative">
@@ -246,7 +223,7 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
                           viewBox="0 0 24 24"
                           xmlns="http://www.w3.org/2000/svg"
                           className={classNames('flex-shrink-0', {
-                            'animate-pulse': isClaudeRunning,
+                            'animate-pulse': isClaudeRunning || false,
                           })}
                         >
                           <path
@@ -262,12 +239,12 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
                       <div className="i-ph:terminal-window-duotone text-lg" />
                     )}
                     {isClaude ? (isClaudeRunning ? 'Claude (Running)' : 'Claude') : 'Terminal'}{' '}
-                    {terminalCount > 1 && index + 1}
+                    {terminalKeys.length > 1 && terminalKeys.indexOf(terminalId) + 1}
                   </button>
                 );
               })}
-              {terminalCount < MAX_TERMINALS && <IconButton icon="i-ph:plus" size="md" onClick={addTerminal} />}
-              {terminalCount < MAX_TERMINALS && (
+              {terminalKeys.length < MAX_TERMINALS && <IconButton icon="i-ph:plus" size="md" onClick={addTerminal} />}
+              {terminalKeys.length < MAX_TERMINALS && (
                 <IconButton size="md" onClick={addClaudeTerminal} title="Open Claude Code Terminal">
                   <svg
                     height="1em"
@@ -292,19 +269,19 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
                 onClick={() => workbenchStore.toggleTerminal(false)}
               />
             </div>
-            {Array.from({ length: terminalCount }, (_, index) => {
-              const isActive = activeTerminal === index;
+            {terminalKeys.map((terminalId) => {
+              const isActive = activeTerminalId === terminalId;
 
               return (
                 <Terminal
-                  key={index}
+                  key={terminalId}
                   className={classNames('h-full overflow-hidden', {
                     hidden: !isActive,
                   })}
                   ref={(ref) => {
-                    terminalRefs.current[index] = ref;
+                    terminalRefs.current[terminalId] = ref;
                   }}
-                  onTerminalReady={(terminal) => workbenchStore.attachTerminal(terminal, terminalCommands[index])}
+                  onTerminalReady={(terminal) => workbenchStore.attachTerminal(terminalId, terminal)}
                   onTerminalResize={(cols, rows) => workbenchStore.onTerminalResize(cols, rows)}
                   theme={theme}
                 />
@@ -367,176 +344,143 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
                 />
               </div>
               <div className="relative flex-1 overflow-hidden">
-                {isWide ? (
-                  <div className="h-full flex">
-                    {/* Left side: Sidebar + Editor with terminal below */}
-                    <div className="flex-1">
-                      <PanelGroup direction="vertical">
-                        <Panel defaultSize={showTerminal ? DEFAULT_EDITOR_SIZE : 100} minSize={20}>
-                          <div className="h-full flex">
-                            {/* Left sidebar with FileTree and TestExplorerPanel */}
-                            <div className="w-[250px] h-full border-r border-bolt-elements-borderColor">
-                              <div className="flex items-center bg-bolt-elements-background-depth-1 border-b border-bolt-elements-borderColor">
-                                <div className="flex w-full">
-                                  <button
-                                    className={classNames(
-                                      'flex-1 py-2 px-3 font-medium text-sm',
-                                      activeSidebarPanel === 'files'
-                                        ? 'bg-bolt-elements-background-depth-0 border-b-2 border-bolt-brand'
-                                        : 'text-bolt-elements-textSecondary hover:bg-bolt-elements-background-depth-0',
-                                    )}
-                                    onClick={() => toggleSidebarPanel('files')}
-                                  >
-                                    <div className="flex items-center justify-center">
-                                      <div className="i-ph:folder mr-2" />
-                                      Files
-                                    </div>
-                                  </button>
-                                  <button
-                                    className={classNames(
-                                      'flex-1 py-2 px-3 font-medium text-sm',
-                                      activeSidebarPanel === 'tests'
-                                        ? 'bg-bolt-elements-background-depth-0 border-b-2 border-bolt-brand'
-                                        : 'text-bolt-elements-textSecondary hover:bg-bolt-elements-background-depth-0',
-                                    )}
-                                    onClick={() => toggleSidebarPanel('tests')}
-                                  >
-                                    <div className="flex items-center justify-center">
-                                      <div className="i-ph:bug mr-2" />
-                                      Tests
-                                    </div>
-                                  </button>
-                                </div>
+                <div className="h-full flex">
+                  {/* Main content area: Sidebar + Editor + Terminal */}
+                  <div className="flex-1">
+                    <PanelGroup direction="vertical">
+                      <Panel defaultSize={showTerminal ? DEFAULT_EDITOR_SIZE : 100} minSize={20}>
+                        <div className="h-full flex">
+                          {/* Left sidebar with FileTree and TestExplorerPanel */}
+                          <div className="w-[250px] h-full border-r border-bolt-elements-borderColor">
+                            <div className="flex items-center bg-bolt-elements-background-depth-1 border-b border-bolt-elements-borderColor">
+                              <div className="flex w-full">
+                                <button
+                                  className={classNames(
+                                    'flex-1 py-2 px-3 font-medium text-sm',
+                                    activeSidebarPanel === 'files'
+                                      ? 'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent border-b-2 border-bolt-brand'
+                                      : 'bg-bolt-elements-item-backgroundActive text-bolt-elements-textSecondary hover:bg-bolt-elements-item-backgroundAccent',
+                                  )}
+                                  onClick={() => toggleSidebarPanel('files')}
+                                >
+                                  <div className="flex items-center justify-center">
+                                    <div className="i-ph:folder mr-2" />
+                                    Files
+                                  </div>
+                                </button>
+                                <button
+                                  className={classNames(
+                                    'flex-1 py-2 px-3 font-medium text-sm',
+                                    activeSidebarPanel === 'tests'
+                                      ? 'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent border-b-2 border-bolt-brand'
+                                      : 'bg-bolt-elements-item-backgroundActive text-bolt-elements-textSecondary hover:bg-bolt-elements-item-backgroundAccent',
+                                  )}
+                                  onClick={() => toggleSidebarPanel('tests')}
+                                >
+                                  <div className="flex items-center justify-center">
+                                    <div className="i-ph:bug mr-2" />
+                                    Tests
+                                  </div>
+                                </button>
+                                <button
+                                  className={classNames(
+                                    'flex-1 py-2 px-3 font-medium text-sm',
+                                    activeSidebarPanel === 'search'
+                                      ? 'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent border-b-2 border-bolt-brand'
+                                      : 'bg-bolt-elements-item-backgroundActive text-bolt-elements-textSecondary hover:bg-bolt-elements-item-backgroundAccent',
+                                  )}
+                                  onClick={() => toggleSidebarPanel('search')}
+                                >
+                                  <div className="flex items-center justify-center">
+                                    <div className="i-ph:magnifying-glass mr-2" />
+                                    Search
+                                  </div>
+                                </button>
                               </div>
+                            </div>
 
-                              <div className="h-[calc(100%-40px)] overflow-hidden">
-                                {activeSidebarPanel === 'files' ? (
-                                  <FileTree
-                                    className="h-full p-2"
-                                    files={files}
-                                    hideRoot
-                                    unsavedFiles={unsavedFiles}
-                                    rootFolder={WORK_DIR}
+                            <div className="h-[calc(100%-40px)] overflow-hidden">
+                              {activeSidebarPanel === 'files' ? (
+                                <FileTree
+                                  className="h-full p-2"
+                                  files={files}
+                                  hideRoot
+                                  unsavedFiles={unsavedFiles}
+                                  rootFolder={WORK_DIR}
+                                  selectedFile={selectedFile}
+                                  onFileSelect={onFileSelect}
+                                />
+                              ) : activeSidebarPanel === 'tests' ? (
+                                <TestExplorerPanel />
+                              ) : (
+                                <SearchPanel onFileSelect={onFileSelect} />
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Editor panel */}
+                          <div className="flex-1">
+                            <div className="relative h-full overflow-hidden">
+                              {!isWide && (
+                                <View
+                                  initial={{ x: selectedView === 'code' ? 0 : '-100%' }}
+                                  animate={{ x: selectedView === 'code' ? 0 : '-100%' }}
+                                >
+                                  <EditorPanel
+                                    editorDocument={currentDocument}
+                                    isStreaming={isStreaming}
                                     selectedFile={selectedFile}
+                                    files={files}
+                                    unsavedFiles={unsavedFiles}
                                     onFileSelect={onFileSelect}
+                                    onEditorScroll={onEditorScroll}
+                                    onEditorChange={onEditorChange}
+                                    onFileSave={onFileSave}
+                                    onFileReset={onFileReset}
+                                    hideFileExplorer={true}
+                                    hideTerminal={true}
                                   />
-                                ) : (
-                                  <TestExplorerPanel />
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Editor panel */}
-                            <div className="flex-1 border-r border-bolt-elements-borderColor">
-                              <EditorPanel
-                                editorDocument={currentDocument}
-                                isStreaming={isStreaming}
-                                selectedFile={selectedFile}
-                                files={files}
-                                unsavedFiles={unsavedFiles}
-                                onFileSelect={onFileSelect}
-                                onEditorScroll={onEditorScroll}
-                                onEditorChange={onEditorChange}
-                                onFileSave={onFileSave}
-                                onFileReset={onFileReset}
-                                hideFileExplorer={true}
-                                sidebarMode={true}
-                              />
+                                </View>
+                              )}
+                              {!isWide && (
+                                <View
+                                  initial={{ x: selectedView === 'preview' ? 0 : '100%' }}
+                                  animate={{ x: selectedView === 'preview' ? 0 : '100%' }}
+                                >
+                                  <Preview />
+                                </View>
+                              )}
+                              {isWide && (
+                                <EditorPanel
+                                  editorDocument={currentDocument}
+                                  isStreaming={isStreaming}
+                                  selectedFile={selectedFile}
+                                  files={files}
+                                  unsavedFiles={unsavedFiles}
+                                  onFileSelect={onFileSelect}
+                                  onEditorScroll={onEditorScroll}
+                                  onEditorChange={onEditorChange}
+                                  onFileSave={onFileSave}
+                                  onFileReset={onFileReset}
+                                  hideFileExplorer={true}
+                                  hideTerminal={true}
+                                />
+                              )}
                             </div>
                           </div>
-                        </Panel>
-                        {renderTerminal()}
-                      </PanelGroup>
-                    </div>
-
-                    {/* Right side: Preview panel */}
-                    <div className="flex-1">
-                      <Preview />
-                    </div>
+                        </div>
+                      </Panel>
+                      {renderTerminal()}
+                    </PanelGroup>
                   </div>
-                ) : (
-                  <>
-                    <View
-                      initial={{ x: selectedView === 'code' ? 0 : '-100%' }}
-                      animate={{ x: selectedView === 'code' ? 0 : '-100%' }}
-                    >
-                      <div className="h-full flex">
-                        <div className="w-[250px] h-full border-r border-bolt-elements-borderColor">
-                          <div className="flex items-center bg-bolt-elements-background-depth-1 border-b border-bolt-elements-borderColor">
-                            <div className="flex w-full">
-                              <button
-                                className={classNames(
-                                  'flex-1 py-2 px-3 font-medium text-sm',
-                                  activeSidebarPanel === 'files'
-                                    ? 'bg-bolt-elements-background-depth-0 border-b-2 border-bolt-brand'
-                                    : 'text-bolt-elements-textSecondary hover:bg-bolt-elements-background-depth-0',
-                                )}
-                                onClick={() => toggleSidebarPanel('files')}
-                              >
-                                <div className="flex items-center justify-center">
-                                  <div className="i-ph:folder mr-2" />
-                                  Files
-                                </div>
-                              </button>
-                              <button
-                                className={classNames(
-                                  'flex-1 py-2 px-3 font-medium text-sm',
-                                  activeSidebarPanel === 'tests'
-                                    ? 'bg-bolt-elements-background-depth-0 border-b-2 border-bolt-brand'
-                                    : 'text-bolt-elements-textSecondary hover:bg-bolt-elements-background-depth-0',
-                                )}
-                                onClick={() => toggleSidebarPanel('tests')}
-                              >
-                                <div className="flex items-center justify-center">
-                                  <div className="i-ph:bug mr-2" />
-                                  Tests
-                                </div>
-                              </button>
-                            </div>
-                          </div>
 
-                          <div className="h-[calc(100%-40px)] overflow-hidden">
-                            {activeSidebarPanel === 'files' ? (
-                              <FileTree
-                                className="h-full p-2"
-                                files={files}
-                                hideRoot
-                                unsavedFiles={unsavedFiles}
-                                rootFolder={WORK_DIR}
-                                selectedFile={selectedFile}
-                                onFileSelect={onFileSelect}
-                              />
-                            ) : (
-                              <TestExplorerPanel />
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex-1 h-full">
-                          <EditorPanel
-                            editorDocument={currentDocument}
-                            isStreaming={isStreaming}
-                            selectedFile={selectedFile}
-                            files={files}
-                            unsavedFiles={unsavedFiles}
-                            onFileSelect={onFileSelect}
-                            onEditorScroll={onEditorScroll}
-                            onEditorChange={onEditorChange}
-                            onFileSave={onFileSave}
-                            onFileReset={onFileReset}
-                            hideFileExplorer={true}
-                          />
-                        </div>
-                      </div>
-                    </View>
-                    <View
-                      initial={{ x: selectedView === 'preview' ? 0 : '100%' }}
-                      animate={{ x: selectedView === 'preview' ? 0 : '100%' }}
-                    >
+                  {/* Preview panel - only show when wide */}
+                  {isWide && (
+                    <div className="flex-1 border-l border-bolt-elements-borderColor">
                       <Preview />
-                    </View>
-                  </>
-                )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

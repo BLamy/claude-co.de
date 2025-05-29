@@ -6,7 +6,7 @@ import { createScopedLogger, renderLogger } from '~/utils/logger';
 const logger = createScopedLogger('FileTree');
 
 const NODE_PADDING_LEFT = 8;
-const DEFAULT_HIDDEN_FILES = [/\/node_modules\//, /\/\.next/, /\/\.astro/];
+const DEFAULT_HIDDEN_FILES = [/\/node_modules\//, /\/\.next/, /\/\.astro/, /\/\.timetravel/];
 
 interface Props {
   files?: FileMap;

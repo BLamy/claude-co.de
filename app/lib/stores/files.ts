@@ -129,18 +129,32 @@ export class FilesStore {
       }
     });
 
+    logger.info('Setting up file watcher for path:', `${WORK_DIR}/**`);
+
     webcontainer.internal.watchPaths(
       { include: [`${WORK_DIR}/**`], exclude: ['**/node_modules', '.git'], includeContent: true },
       bufferWatchEvents(100, this.#processEventBuffer.bind(this)),
     );
+
+    // Check if there are any existing files in the webcontainer
+    try {
+      const files = await webcontainer.fs.readdir(WORK_DIR, { withFileTypes: true });
+      logger.info('Existing files in webcontainer:', files);
+    } catch (error) {
+      logger.error('Error reading webcontainer directory:', error);
+    }
   }
 
   #processEventBuffer(events: Array<[events: PathWatcherEvent[]]>) {
     const watchEvents = events.flat(2);
 
+    logger.info('Processing file events, count:', watchEvents.length);
+
     for (const { type, path, buffer } of watchEvents) {
       // remove any trailing slashes
       const sanitizedPath = path.replace(/\/+$/g, '');
+
+      logger.debug('File event:', { type, path: sanitizedPath });
 
       switch (type) {
         case 'add_dir': {

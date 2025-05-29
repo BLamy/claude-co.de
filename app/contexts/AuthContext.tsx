@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('encryptedCredentials');
       setHasStoredCredentials(!!stored);
-      
+
       if (stored) {
         // Auto-trigger biometric auth if credentials exist
         attemptBiometricLogin();
@@ -76,6 +76,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const checkWebContainer = async () => {
       try {
         const instance = await webcontainer;
+
         if (instance) {
           window.wc = instance;
           setIsWebContainerReady(true);
@@ -94,6 +95,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setError(null);
 
       const storedData = localStorage.getItem('encryptedCredentials');
+
       if (!storedData) {
         throw new Error('No stored credentials found');
       }
@@ -107,19 +109,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       // Decrypt the stored credentials
       const decryptedValue = await decryptData(key, stored.encryptedValue);
-      
+
       // For Claude type, the decrypted value might be the full config JSON
       let claudeConfig = null;
       let finalValue = decryptedValue;
-      
+
       if (stored.type === 'claude') {
         try {
           claudeConfig = JSON.parse(decryptedValue);
           console.log('[Auth] Decrypted Claude config for biometric login');
-          
+
           // Restore the config file
           await restoreClaudeConfig(claudeConfig);
-          
+
           // Use the original format for credentials
           finalValue = decryptedValue;
         } catch (e) {
@@ -127,7 +129,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           console.log('[Auth] Decrypted regular auth code for biometric login');
         }
       }
-      
+
       setCredentials({
         type: stored.type,
         value: finalValue,
@@ -135,6 +137,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } catch (err) {
       console.error('Biometric login failed:', err);
       setError('Biometric authentication failed. Please login again.');
+
       // Clear invalid stored credentials
       localStorage.removeItem('encryptedCredentials');
       setHasStoredCredentials(false);
@@ -143,22 +146,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, []);
 
-
   const restoreClaudeConfig = async (claudeConfig: any) => {
     try {
       const instance = await webcontainer;
-      if (!instance) throw new Error('WebContainer not ready');
+
+      if (!instance) {
+        throw new Error('WebContainer not ready');
+      }
 
       console.log('[Auth] Restoring Claude config to ~/.claude.json...');
-      
+
       // Write the config back to the file system
       await instance.fs.writeFile('claude.json', JSON.stringify(claudeConfig, null, 2));
       await instance.spawn('mv', ['claude.json', '/home/.claude.json']);
 
-
       console.log('[Auth] Claude config restored successfully');
     } catch (err) {
       console.error('[Auth] Failed to restore Claude config:', err);
+
       // Don't throw here as this is not critical for authentication
     }
   };
@@ -166,14 +171,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const getClaudeUserEmail = async (): Promise<string> => {
     try {
       const instance = await webcontainer;
-      if (!instance) throw new Error('WebContainer not ready');
+
+      if (!instance) {
+        throw new Error('WebContainer not ready');
+      }
 
       console.log('[Auth] Reading Claude user email from ~/.claude.json...');
 
       // Read the .claude.json file from the home directory
       const claudeConfigContent = await instance.fs.readFile('/home/.claude.json', 'utf-8');
       const claudeConfig = JSON.parse(claudeConfigContent);
-      
+
       if (claudeConfig?.oauthAccount?.emailAddress) {
         console.log('[Auth] Found user email:', claudeConfig.oauthAccount.emailAddress);
         return claudeConfig.oauthAccount.emailAddress;
@@ -183,83 +191,87 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
     } catch (err) {
       console.error('Failed to read Claude user email:', err);
+
       // Return fallback email if reading fails
       return `user@${window.location.hostname}`;
     }
   };
 
-  const authenticate = useCallback(async (creds: { type: 'apiKey' | 'claude'; value: string }) => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  const authenticate = useCallback(
+    async (creds: { type: 'apiKey' | 'claude'; value: string }) => {
+      try {
+        setIsLoading(true);
+        setError(null);
 
-      let userEmail = `user@${window.location.hostname}`; // fallback
-      let claudeConfig = null;
+        let userEmail = `user@${window.location.hostname}`; // fallback
+        let claudeConfig = null;
 
-      if (creds.type === 'claude') {
-        try {
-          // The value might be a JSON string containing the full Claude config
-          claudeConfig = JSON.parse(creds.value);
-          userEmail = claudeConfig?.oauthAccount?.emailAddress || userEmail;
-          console.log('[Auth] Using Claude config from LoginPage, email:', userEmail);
-        } catch (e) {
-          // If it's not JSON, treat it as a regular auth code and read from file
-          console.log('[Auth] Auth code provided, reading from .claude.json...');
-          userEmail = await getClaudeUserEmail();
-          
-          // Read the full config for storage
-          const instance = await webcontainer;
-          if (instance) {
-            const claudeConfigContent = await instance.fs.readFile('/home/.claude.json', 'utf-8');
-            claudeConfig = JSON.parse(claudeConfigContent);
+        if (creds.type === 'claude') {
+          try {
+            // The value might be a JSON string containing the full Claude config
+            claudeConfig = JSON.parse(creds.value);
+            userEmail = claudeConfig?.oauthAccount?.emailAddress || userEmail;
+            console.log('[Auth] Using Claude config from LoginPage, email:', userEmail);
+          } catch (e) {
+            // If it's not JSON, treat it as a regular auth code and read from file
+            console.log('[Auth] Auth code provided, reading from .claude.json...');
+            userEmail = await getClaudeUserEmail();
+
+            // Read the full config for storage
+            const instance = await webcontainer;
+
+            if (instance) {
+              const claudeConfigContent = await instance.fs.readFile('/home/.claude.json', 'utf-8');
+              claudeConfig = JSON.parse(claudeConfigContent);
+            }
           }
         }
+
+        // Set credentials with the original auth code
+        setCredentials(creds);
+
+        // Create a new passkey if this is the first login
+        if (!hasStoredCredentials) {
+          const credential = await startRegistration(userEmail);
+
+          // Derive encryption key from the credential
+          const keyBasisBuffer = base64URLStringToBuffer(credential.rawId);
+          const key = await deriveKey(keyBasisBuffer);
+
+          // For Claude type, encrypt the full config; for API key, encrypt the key
+          const valueToEncrypt = creds.type === 'claude' && claudeConfig ? JSON.stringify(claudeConfig) : creds.value;
+
+          const encryptedValue = await encryptData(key, valueToEncrypt);
+
+          // Store encrypted credentials
+          const toStore: StoredCredentials = {
+            type: creds.type,
+            encryptedValue,
+            userIdentifier: credential.rawId,
+          };
+
+          localStorage.setItem('encryptedCredentials', JSON.stringify(toStore));
+          setHasStoredCredentials(true);
+
+          console.log('[Auth] Credentials encrypted and stored with WebAuthn');
+        }
+
+        // If it's a Claude authentication, restore the config file for future use
+        if (creds.type === 'claude' && claudeConfig) {
+          await restoreClaudeConfig(claudeConfig);
+        }
+      } catch (err) {
+        console.error('Authentication failed:', err);
+
+        const errorMessage = err instanceof Error ? err.message : 'Authentication failed. Please try again.';
+        setError(errorMessage);
+        throw err;
+      } finally {
+        setIsLoading(false);
       }
-
-      // Set credentials with the original auth code
-      setCredentials(creds);
-
-      // Create a new passkey if this is the first login
-      if (!hasStoredCredentials) {
-        const credential = await startRegistration(userEmail);
-        
-        // Derive encryption key from the credential
-        const keyBasisBuffer = base64URLStringToBuffer(credential.rawId);
-        const key = await deriveKey(keyBasisBuffer);
-
-        // For Claude type, encrypt the full config; for API key, encrypt the key
-        const valueToEncrypt = creds.type === 'claude' && claudeConfig 
-          ? JSON.stringify(claudeConfig) 
-          : creds.value;
-        
-        const encryptedValue = await encryptData(key, valueToEncrypt);
-
-        // Store encrypted credentials
-        const toStore: StoredCredentials = {
-          type: creds.type,
-          encryptedValue,
-          userIdentifier: credential.rawId,
-        };
-
-        localStorage.setItem('encryptedCredentials', JSON.stringify(toStore));
-        setHasStoredCredentials(true);
-        
-        console.log('[Auth] Credentials encrypted and stored with WebAuthn');
-      }
-
-      // If it's a Claude authentication, restore the config file for future use
-      if (creds.type === 'claude' && claudeConfig) {
-        await restoreClaudeConfig(claudeConfig);
-      }
-    } catch (err) {
-      console.error('Authentication failed:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Authentication failed. Please try again.';
-      setError(errorMessage);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [hasStoredCredentials]);
+    },
+    [hasStoredCredentials],
+  );
 
   const logout = useCallback(() => {
     setCredentials(null);
@@ -283,10 +295,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   if (!credentials && !hasStoredCredentials) {
     return (
       <AuthContext.Provider value={contextValue}>
-        <LoginPage 
-          onAuthenticate={authenticate}
-          isWebContainerReady={isWebContainerReady}
-        />
+        <LoginPage onAuthenticate={authenticate} isWebContainerReady={isWebContainerReady} />
       </AuthContext.Provider>
     );
   }
@@ -298,12 +307,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Welcome back!</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Use your biometrics to access Bolt
-            </p>
-            {error && (
-              <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
-            )}
+            <p className="text-gray-600 dark:text-gray-400 mb-6">Use your biometrics to access Bolt</p>
+            {error && <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>}
             <button
               onClick={attemptBiometricLogin}
               disabled={isLoading}
@@ -327,11 +332,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }
 
   // Render children when authenticated
-  return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 };
 
 /**

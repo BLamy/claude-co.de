@@ -57,29 +57,27 @@ export class TestStore {
   async runTests() {
     const webcontainer = await this.#webcontainer;
     this.testStatus.set({ text: 'Running tests…', color: '#E0AF0B' });
-    
+
     const t0 = performance.now();
+
     try {
       const proc = await webcontainer.spawn('npm', ['test']);
       const exitCode = await proc.exit;
       const dt = Math.round(performance.now() - t0);
 
       const collected = await this.#collectDebugData(webcontainer);
-      const totalTests = Object.values(collected).reduce(
-        (sum, suite) => sum + Object.keys(suite).length, 
-        0
-      );
-      
-      this.testStats.set({ 
-        total: totalTests, 
+      const totalTests = Object.values(collected).reduce((sum, suite) => sum + Object.keys(suite).length, 0);
+
+      this.testStats.set({
+        total: totalTests,
         passing: totalTests, // Assuming all pass for now
-        time: `${dt}ms` 
+        time: `${dt}ms`,
       });
-      
+
       this.testSuites.set(collected);
-      this.testStatus.set({ 
-        text: `Tests finished${exitCode !== 0 ? ` (Code: ${exitCode})` : ''}`, 
-        color: exitCode === 0 ? '#3BB446' : '#E00B0B' 
+      this.testStatus.set({
+        text: `Tests finished${exitCode !== 0 ? ` (Code: ${exitCode})` : ''}`,
+        color: exitCode === 0 ? '#3BB446' : '#E00B0B',
       });
     } catch (error: any) {
       console.error('Failed to run tests:', error);
@@ -87,7 +85,7 @@ export class TestStore {
       this.testStats.set({ total: 0, passing: 0, time: '--' });
       this.testSuites.set({});
     }
-    
+
     // Clear selected steps after running
     this.selectedTestSteps.set(null);
     this.currentStepIndex.set(0);
@@ -97,10 +95,10 @@ export class TestStore {
   async #collectDebugData(webcontainer: WebContainer): Promise<TestSuiteData> {
     const collected: TestSuiteData = {};
     const debugDir = '/.timetravel';
-    
+
     try {
       const suiteDirs = await webcontainer.fs.readdir(debugDir, { withFileTypes: true });
-      
+
       for (const suiteDir of suiteDirs) {
         if (!suiteDir.isDirectory() || ['DefaultSuite', 'UnknownTest'].includes(suiteDir.name)) {
           continue;
@@ -108,9 +106,9 @@ export class TestStore {
 
         const suiteName = suiteDir.name;
         collected[suiteName] = {};
-        
-        const testFiles = await webcontainer.fs.readdir(`${debugDir}/${suiteName}`, { 
-          withFileTypes: true 
+
+        const testFiles = await webcontainer.fs.readdir(`${debugDir}/${suiteName}`, {
+          withFileTypes: true,
         });
 
         for (const testFile of testFiles) {
@@ -118,15 +116,10 @@ export class TestStore {
             continue;
           }
 
-          const testName = testFile.name.endsWith('.json') 
-            ? testFile.name.slice(0, -5) 
-            : testFile.name;
-            
-          const jsonStr = await webcontainer.fs.readFile(
-            `${debugDir}/${suiteName}/${testFile.name}`,
-            'utf-8'
-          );
-          
+          const testName = testFile.name.endsWith('.json') ? testFile.name.slice(0, -5) : testFile.name;
+
+          const jsonStr = await webcontainer.fs.readFile(`${debugDir}/${suiteName}/${testFile.name}`, 'utf-8');
+
           try {
             collected[suiteName][testName] = JSON.parse(jsonStr);
           } catch (parseError) {
@@ -140,7 +133,7 @@ export class TestStore {
         console.error('Error reading debug data:', error);
       }
     }
-    
+
     return collected;
   }
 
@@ -150,29 +143,30 @@ export class TestStore {
 
   goToStep(index: number) {
     const steps = this.selectedTestSteps.get();
+
     if (!steps || index < 0 || index >= steps.length) {
       return;
     }
 
     this.currentStepIndex.set(index);
-    
+
     const step = steps[index];
     console.log('DEBUG - goToStep - original file path:', step.file, 'line:', step.line);
-    
+
     /*
      * Extract the relative path from the full path.
      * Improved handling for various path formats.
      */
     const filePath = extractRelativePath(step.file);
     console.log('DEBUG - goToStep - processed file path:', filePath);
-    
+
     // create a new object literal to ensure reactivity
-    const newHighlight = { 
-      filePath, 
+    const newHighlight = {
+      filePath,
       line: step.line,
     };
 
-    /* 
+    /*
      * Set the new highlight value. If the value is the same object reference,
      * nanostores might not notify listeners. Creating a new object ensures notification.
      */
@@ -183,8 +177,8 @@ export class TestStore {
   clearHighlight() {
     // set to null to clear the highlight
     if (this.highlightedLine.get() !== null) {
-        this.highlightedLine.set(null);
-        console.log('DEBUG - highlight cleared');
+      this.highlightedLine.set(null);
+      console.log('DEBUG - highlight cleared');
     }
   }
 }
@@ -195,11 +189,11 @@ export class TestStore {
  */
 function extractRelativePath(fullPath: string): string {
   console.log('DEBUG - extractRelativePath - input path:', fullPath);
-  
+
   // remove any leading /home/project/.bolt/ or similar paths
   const parts = fullPath.split('/');
   console.log('DEBUG - extractRelativePath - path parts:', parts);
-  
+
   // check for common patterns in paths and handle them
   if (parts.includes('project') || parts.includes('home')) {
     // find important parts of the path after project structure markers
@@ -209,17 +203,21 @@ function extractRelativePath(fullPath: string): string {
         console.log('DEBUG - extractRelativePath - skipping path segment:', parts[i]);
         continue;
       }
-      
+
       // return the rest of the path
       const result = parts.slice(i).join('/');
       console.log('DEBUG - extractRelativePath - returning path after segment', i, ':', result);
+
       return result;
     }
   }
-  
-  // if we can't determine a specific pattern, use the filename as fallback
-  // or the last 2 segments if there are multiple segments
+
+  /*
+   * if we can't determine a specific pattern, use the filename as fallback
+   * or the last 2 segments if there are multiple segments
+   */
   const fallbackResult = parts.length > 2 ? parts.slice(-2).join('/') : parts[parts.length - 1];
   console.log('DEBUG - extractRelativePath - using fallback path:', fallbackResult);
+
   return fallbackResult;
-} 
+}
