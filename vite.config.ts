@@ -10,6 +10,9 @@ export default defineConfig((config) => {
     build: {
       target: 'esnext',
     },
+    optimizeDeps: {
+      exclude: ['@electric-sql/pglite'],
+    },
     plugins: [
       nodePolyfills({
         include: ['path', 'buffer'],

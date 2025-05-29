@@ -138,8 +138,9 @@ export class FilesStore {
 
     // Check if there are any existing files in the webcontainer
     try {
-      const files = await webcontainer.fs.readdir(WORK_DIR, { withFileTypes: true });
-      logger.info('Existing files in webcontainer:', files);
+      const workdir = webcontainer.workdir || WORK_DIR;
+      const files = await webcontainer.fs.readdir(workdir, { withFileTypes: true });
+      logger.info('Existing files in webcontainer at', workdir, ':', files);
     } catch (error) {
       logger.error('Error reading webcontainer directory:', error);
     }

@@ -1,0 +1,12 @@
+{
+  "name": "bolt-webcontainer-git",
+  "version": "1.0.0",
+  "description": "Git functionality for Bolt WebContainer",
+  "type": "module",
+  "dependencies": {
+    "isomorphic-git": "^1.25.10"
+  },
+  "bin": {
+    "git": ".bolt/bin/git.ts"
+  }
+}
