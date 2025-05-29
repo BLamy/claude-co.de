@@ -2,7 +2,7 @@ import type { WebContainer } from '@webcontainer/api';
 import type { ITerminal } from '~/types/terminal';
 import { withResolvers } from './promises';
 
-export async function newShellProcess(webcontainer: WebContainer, terminal: ITerminal) {
+export async function newShellProcess(webcontainer: WebContainer, terminal: ITerminal, initialCommand?: string) {
   const args: string[] = [];
 
   // we spawn a JSH process with a fallback cols and rows in case the process is not attached yet to a visible terminal
@@ -46,6 +46,11 @@ export async function newShellProcess(webcontainer: WebContainer, terminal: ITer
   });
 
   await jshReady.promise;
+
+  // If an initial command is provided, execute it
+  if (initialCommand && isInteractive) {
+    await input.write(initialCommand + '\n');
+  }
 
   return process;
 }

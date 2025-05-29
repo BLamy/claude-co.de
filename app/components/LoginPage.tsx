@@ -20,7 +20,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
   const [isExtractingUrl, setIsExtractingUrl] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [isTerminalReady, setIsTerminalReady] = useState(false);
-  const [loginCompletedData, setLoginCompletedData] = useState<{ userEmail: string | null; claudeConfig?: any } | null>(null);
+  const [loginCompletedData, setLoginCompletedData] = useState<{ userEmail: string | null; claudeConfig?: any } | null>(
+    null,
+  );
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -31,62 +33,60 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
   useEffect(() => {
     if (terminalRef.current && !xtermRef.current) {
       // Dynamic import to avoid SSR issues
-      Promise.all([
-        import('@xterm/xterm'),
-        import('@xterm/addon-fit'),
-        import('@xterm/xterm/css/xterm.css'),
-      ]).then(([{ Terminal }, { FitAddon }]) => {
-        const terminal = new Terminal({
-          cursorBlink: true,
-          fontSize: 13,
-          fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-          theme: {
-            background: '#0a0a0a',
-            foreground: '#d4d4d4',
-            cursor: '#d4d4d4',
-            black: '#0a0a0a',
-            red: '#ff5555',
-            green: '#50fa7b',
-            yellow: '#f1fa8c',
-            blue: '#bd93f9',
-            magenta: '#ff79c6',
-            cyan: '#8be9fd',
-            white: '#bfbfbf',
-            brightBlack: '#4d4d4d',
-            brightRed: '#ff6e6e',
-            brightGreen: '#69ff94',
-            brightYellow: '#ffffa5',
-            brightBlue: '#d6acff',
-            brightMagenta: '#ff92df',
-            brightCyan: '#a4ffff',
-            brightWhite: '#ffffff',
-          },
+      Promise.all([import('@xterm/xterm'), import('@xterm/addon-fit'), import('@xterm/xterm/css/xterm.css')])
+        .then(([{ Terminal }, { FitAddon }]) => {
+          const terminal = new Terminal({
+            cursorBlink: true,
+            fontSize: 13,
+            fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+            theme: {
+              background: '#0a0a0a',
+              foreground: '#d4d4d4',
+              cursor: '#d4d4d4',
+              black: '#0a0a0a',
+              red: '#ff5555',
+              green: '#50fa7b',
+              yellow: '#f1fa8c',
+              blue: '#bd93f9',
+              magenta: '#ff79c6',
+              cyan: '#8be9fd',
+              white: '#bfbfbf',
+              brightBlack: '#4d4d4d',
+              brightRed: '#ff6e6e',
+              brightGreen: '#69ff94',
+              brightYellow: '#ffffa5',
+              brightBlue: '#d6acff',
+              brightMagenta: '#ff92df',
+              brightCyan: '#a4ffff',
+              brightWhite: '#ffffff',
+            },
+          });
+
+          const fitAddon = new FitAddon();
+          terminal.loadAddon(fitAddon);
+
+          terminal.open(terminalRef.current!);
+          fitAddon.fit();
+
+          xtermRef.current = terminal;
+          fitAddonRef.current = fitAddon;
+          setIsTerminalReady(true);
+
+          // Handle window resize
+          const handleResize = () => {
+            if (showTerminal && fitAddon) {
+              fitAddon.fit();
+            }
+          };
+          window.addEventListener('resize', handleResize);
+
+          return () => {
+            window.removeEventListener('resize', handleResize);
+          };
+        })
+        .catch((err) => {
+          console.error('Failed to load terminal:', err);
         });
-
-        const fitAddon = new FitAddon();
-        terminal.loadAddon(fitAddon);
-        
-        terminal.open(terminalRef.current!);
-        fitAddon.fit();
-        
-        xtermRef.current = terminal;
-        fitAddonRef.current = fitAddon;
-        setIsTerminalReady(true);
-
-        // Handle window resize
-        const handleResize = () => {
-          if (showTerminal && fitAddon) {
-            fitAddon.fit();
-          }
-        };
-        window.addEventListener('resize', handleResize);
-
-        return () => {
-          window.removeEventListener('resize', handleResize);
-        };
-      }).catch(err => {
-        console.error('Failed to load terminal:', err);
-      });
     }
   }, []); // Remove showTerminal dependency
 
@@ -99,8 +99,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
     }
   }, [showTerminal]);
 
-  // This effect is no longer needed since we connect the process in extractClaudeLoginUrl
-  // Keeping it empty for now in case we need to add other terminal-related logic
+  /*
+   * This effect is no longer needed since we connect the process in extractClaudeLoginUrl
+   * Keeping it empty for now in case we need to add other terminal-related logic
+   */
 
   // Watch for WebContainer and terminal to be ready, then extract Claude login URL
   useEffect(() => {
@@ -114,18 +116,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
     if (loginCompletedData && processRef.current && xtermRef.current) {
       const sendEntersAndComplete = async () => {
         console.log('[Auto] Login completed, sending Enter keypresses...');
-        
+
         // Wait a moment for the process to be ready
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
         // Send multiple Enter keypresses to complete the Claude Code flow
         for (let i = 0; i < 5; i++) {
           if (processRef.current) {
             const writer = processRef.current.input.getWriter();
+
             try {
               await writer.write('\r');
               console.log(`[Auto] Sent Enter ${i + 1}/5`);
-              
+
               // Also show in terminal
               if (xtermRef.current) {
                 xtermRef.current.write('\r\n');
@@ -133,26 +136,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
             } finally {
               writer.releaseLock();
             }
-            
+
             // Wait between enters
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise((resolve) => setTimeout(resolve, 500));
           }
         }
-        
+
         console.log('[Auto] Finished sending Enter keypresses, waiting for file...');
-        
+
         // Wait for the .claude.json file to be written
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+
         // Send Ctrl+C to exit Claude Code
         console.log('[Auto] Sending Ctrl+C to exit Claude Code...');
+
         if (processRef.current) {
           const writer = processRef.current.input.getWriter();
+
           try {
             // Send Ctrl+C (ASCII code 3)
             await writer.write('\x03');
             console.log('[Auto] Ctrl+C sent');
-            
+
             // Show in terminal
             if (xtermRef.current) {
               xtermRef.current.write('^C\r\n');
@@ -161,22 +166,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
             writer.releaseLock();
           }
         }
-        
+
         // Wait for process to exit
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
         // Now run cat to verify the file exists
         console.log('[Auto] Running cat ~/.claude.json to verify file...');
+
         const instance = await webcontainer;
+
         if (instance) {
           try {
             const catProcess = await instance.spawn('cat', ['/home/.claude.json']);
-            
+
             // Show cat command in terminal
             if (xtermRef.current) {
               xtermRef.current.writeln('\r\n$ cat ~/.claude.json');
             }
-            
+
             // Capture and display the output
             let jsonOutput = '';
             catProcess.output.pipeTo(
@@ -184,21 +191,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                 write(data) {
                   console.log('[Auto] cat output:', data);
                   jsonOutput += data;
+
                   if (xtermRef.current) {
                     xtermRef.current.write(data);
                   }
                 },
-              })
+              }),
             );
 
-            
             const catExitCode = await catProcess.exit;
             console.log('[Auto] cat command exited with code:', catExitCode);
-            
+
             if (catExitCode === 0) {
               console.log('[Auto] .claude.json file verified successfully');
               console.log('[Auto] JSON output length:', jsonOutput.length);
-              
+
               // Wrap everything in try-catch to see any errors
               try {
                 // Parse the JSON output
@@ -206,45 +213,48 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                 console.log('[Auto] Parsed claude.json successfully');
                 console.log('[Auto] User email from config:', claudeConfig.oauthAccount?.emailAddress);
                 console.log('[Auto] Primary API key exists:', !!claudeConfig.primaryApiKey);
-                
+
                 // Wait a bit before completing authentication
                 console.log('[Auto] Waiting before authentication...');
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+
                 // Complete the authentication flow directly here with the parsed config
                 console.log('[Auto] About to call completeAuthenticationFlow...');
-                console.log('[Auto] Email param:', claudeConfig.oauthAccount?.emailAddress || loginCompletedData.userEmail);
+                console.log(
+                  '[Auto] Email param:',
+                  claudeConfig.oauthAccount?.emailAddress || loginCompletedData.userEmail,
+                );
                 console.log('[Auto] Config param exists:', !!claudeConfig);
-                
+
                 await completeAuthenticationFlow(
                   claudeConfig.oauthAccount?.emailAddress || loginCompletedData.userEmail,
-                  claudeConfig
+                  claudeConfig,
                 );
-                
+
                 console.log('[Auto] completeAuthenticationFlow returned successfully');
               } catch (err) {
                 console.error('[Auto] Error in authentication flow:', err);
                 console.error('[Auto] Error stack:', err.stack);
                 console.error('[Auto] JSON output was:', jsonOutput.substring(0, 200) + '...');
-                
+
                 // Set error for user
                 setError('Authentication failed: ' + err.message);
               }
             } else {
               console.error('[Auto] Failed to read .claude.json file');
-              
+
               // Still try to complete authentication without the cat output
-              await new Promise(resolve => setTimeout(resolve, 1000));
+              await new Promise((resolve) => setTimeout(resolve, 1000));
               await completeAuthenticationFlow(loginCompletedData.userEmail, null);
             }
           } catch (err) {
             console.error('[Auto] Error running cat command:', err);
           }
         }
-        
+
         // Authentication flow is now handled inside the cat output parsing
       };
-      
+
       sendEntersAndComplete();
     }
   }, [loginCompletedData]);
@@ -255,27 +265,29 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
       console.log('[Auth] UserEmail:', userEmail);
       console.log('[Auth] Has claudeConfig:', !!claudeConfig);
       console.log('[Auth] onAuthenticate function exists:', typeof onAuthenticate);
-      
+
       // Check if onAuthenticate exists
       if (!onAuthenticate) {
         throw new Error('onAuthenticate function not provided to LoginPage');
       }
-      
+
       // If we already have the config from cat, use it
       if (claudeConfig) {
         console.log('[Auth] Using Claude config from cat output');
         console.log('[Auth] Email:', claudeConfig.oauthAccount?.emailAddress);
         console.log('[Auth] Config keys:', Object.keys(claudeConfig));
-        
-        // Call the onAuthenticate function with the claude config as the auth code
-        // The AuthContext will handle WebAuthn setup
+
+        /*
+         * Call the onAuthenticate function with the claude config as the auth code
+         * The AuthContext will handle WebAuthn setup
+         */
         console.log('[Auth] Calling onAuthenticate with claude config...');
         console.log('[Auth] Config string length:', JSON.stringify(claudeConfig).length);
-        
+
         try {
-          await onAuthenticate({ 
-            type: 'claude', 
-            value: JSON.stringify(claudeConfig) // Pass the entire config as the "auth code"
+          await onAuthenticate({
+            type: 'claude',
+            value: JSON.stringify(claudeConfig), // Pass the entire config as the "auth code"
           });
           console.log('[Auth] onAuthenticate completed successfully');
         } catch (authErr) {
@@ -286,21 +298,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
       } else {
         // Fallback: read from file if we don't have the config
         console.log('[Auth] Fallback: Reading ~/.claude.json file...');
-        
+
         const instance = await webcontainer;
-        if (!instance) throw new Error('WebContainer not ready');
+
+        if (!instance) {
+          throw new Error('WebContainer not ready');
+        }
 
         const claudeConfigContent = await instance.fs.readFile('/home/.claude.json', 'utf-8');
         const config = JSON.parse(claudeConfigContent);
-        
+
         console.log('[Auth] Claude config loaded from file');
-        
-        await onAuthenticate({ 
-          type: 'claude', 
-          value: JSON.stringify(config)
+
+        await onAuthenticate({
+          type: 'claude',
+          value: JSON.stringify(config),
         });
       }
-      
     } catch (err) {
       console.error('[Auth] Failed to complete authentication flow:', err);
       throw err;
@@ -309,11 +323,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
 
   const extractClaudeLoginUrl = async () => {
     setIsExtractingUrl(true);
+
     // Don't auto-show terminal since it's automated
-    
+
     try {
       const instance = await webcontainer;
-      
+
       if (!instance) {
         console.error('WebContainer not available');
         return;
@@ -342,112 +357,128 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
         let loginCompleted = false;
 
         // Connect process output to terminal
-        process.output.pipeTo(
-          new WritableStream({
-            write(data) {
-              terminal.write(data);
-              outputBuffer += data;
-              
-              // Debug output
-              if (data.trim()) {
-                console.log('[Auto] Output:', data.substring(0, 100), data.length > 100 ? '...' : '');
-              }
+        process.output
+          .pipeTo(
+            new WritableStream({
+              write(data) {
+                terminal.write(data);
+                outputBuffer += data;
 
-              // Auto-select theme (option 1)
-              if (!themeSelected && (
-                data.includes('Choose the text style') ||
-                data.includes('Dark mode') && data.includes('Light mode') ||
-                (data.includes('1.') && data.includes('Dark mode')) ||
-                data.includes('❯')
-              )) {
-                themeSelected = true;
-                console.log('[Auto] Theme menu detected, selecting option 1...');
-                setTimeout(() => {
-                  const writer = process.input.getWriter();
-                  writer.write('1').then(() => {
-                    writer.releaseLock();
-                    console.log('[Auto] Sent: 1');
-                    
-                    setTimeout(() => {
-                      const writer2 = process.input.getWriter();
-                      writer2.write('\r\n').then(() => {
-                        writer2.releaseLock();
-                        console.log('[Auto] Sent: Enter');
+                // Debug output
+                if (data.trim()) {
+                  console.log('[Auto] Output:', data.substring(0, 100), data.length > 100 ? '...' : '');
+                }
+
+                // Auto-select theme (option 1)
+                if (
+                  !themeSelected &&
+                  (data.includes('Choose the text style') ||
+                    (data.includes('Dark mode') && data.includes('Light mode')) ||
+                    (data.includes('1.') && data.includes('Dark mode')) ||
+                    data.includes('❯'))
+                ) {
+                  themeSelected = true;
+                  console.log('[Auto] Theme menu detected, selecting option 1...');
+                  setTimeout(() => {
+                    const writer = process.input.getWriter();
+                    writer
+                      .write('1')
+                      .then(() => {
+                        writer.releaseLock();
+                        console.log('[Auto] Sent: 1');
+
+                        setTimeout(() => {
+                          const writer2 = process.input.getWriter();
+                          writer2.write('\r\n').then(() => {
+                            writer2.releaseLock();
+                            console.log('[Auto] Sent: Enter');
+                          });
+                        }, 100);
+                      })
+                      .catch((err) => {
+                        console.error('[Auto] Failed to send theme selection:', err);
                       });
-                    }, 100);
-                  }).catch(err => {
-                    console.error('[Auto] Failed to send theme selection:', err);
-                  });
-                }, 1500);
-              }
+                  }, 1500);
+                }
 
-              // Auto-select login type (option 2)
-              if (!loginTypeSelected && themeSelected && (
-                data.includes('How would you like to log in') ||
-                (outputBuffer.includes('theme') && data.includes('1.') && data.includes('2.')) ||
-                data.includes('Choose an option') ||
-                (data.includes('❯') && outputBuffer.includes('Dark mode'))
-              )) {
-                loginTypeSelected = true;
-                console.log('[Auto] Login menu detected, selecting option 2...');
-                setTimeout(() => {
-                  const writer = process.input.getWriter();
-                  writer.write('2').then(() => {
-                    writer.releaseLock();
-                    console.log('[Auto] Sent: 2');
-                    
-                    setTimeout(() => {
-                      const writer2 = process.input.getWriter();
-                      writer2.write('\r\n').then(() => {
-                        writer2.releaseLock();
-                        console.log('[Auto] Sent: Enter');
-                      });
-                    }, 100);
-                  });
-                }, 1000);
-              }
+                // Auto-select login type (option 2)
+                if (
+                  !loginTypeSelected &&
+                  themeSelected &&
+                  (data.includes('How would you like to log in') ||
+                    (outputBuffer.includes('theme') && data.includes('1.') && data.includes('2.')) ||
+                    data.includes('Choose an option') ||
+                    (data.includes('❯') && outputBuffer.includes('Dark mode')))
+                ) {
+                  loginTypeSelected = true;
+                  console.log('[Auto] Login menu detected, selecting option 2...');
+                  setTimeout(() => {
+                    const writer = process.input.getWriter();
+                    writer.write('2').then(() => {
+                      writer.releaseLock();
+                      console.log('[Auto] Sent: 2');
 
-              // Check for login URL in output
-              const urlMatch = data.match(/https:\/\/[^\s]+/);
-              if (urlMatch && urlMatch[0].includes('anthropic')) {
-                const cleanUrl = urlMatch[0].replace(/[\x00-\x1F\x7F-\x9F]/g, '');
-                setClaudeLoginUrl(cleanUrl);
-                console.log('[Auto] Found login URL:', cleanUrl);
-              }
+                      setTimeout(() => {
+                        const writer2 = process.input.getWriter();
+                        writer2.write('\r\n').then(() => {
+                          writer2.releaseLock();
+                          console.log('[Auto] Sent: Enter');
+                        });
+                      }, 100);
+                    });
+                  }, 1000);
+                }
 
-              // Check if process is now waiting for auth code
-              if (data.includes('Paste code here') || data.includes('Enter code') || data.includes('authorization code')) {
-                waitingForAuthCode = true;
-                console.log('[Auto] Process is now waiting for authorization code');
-              }
+                // Check for login URL in output
+                const urlMatch = data.match(/https:\/\/[^\s]+/);
 
-              // Check if login is completed
-              if (!loginCompleted && data.includes('Logged in as ')) {
-                loginCompleted = true;
-                console.log('[Auto] Login completed detected!');
-                
-                // Extract email from the "Logged in as" message
-                const emailMatch = data.match(/Logged in as ([^\s\r\n]+)/);
-                const userEmail = emailMatch ? emailMatch[1] : null;
-                console.log('[Auto] User email detected:', userEmail);
-                
-                // Set state to trigger Enter keypresses in the main component
-                setLoginCompletedData({ userEmail });
-              }
-            },
-          })
-        ).catch(err => {
-          console.error('Error piping output:', err);
-        });
+                if (urlMatch && urlMatch[0].includes('anthropic')) {
+                  const cleanUrl = urlMatch[0].replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+                  setClaudeLoginUrl(cleanUrl);
+                  console.log('[Auto] Found login URL:', cleanUrl);
+                }
+
+                // Check if process is now waiting for auth code
+                if (
+                  data.includes('Paste code here') ||
+                  data.includes('Enter code') ||
+                  data.includes('authorization code')
+                ) {
+                  waitingForAuthCode = true;
+                  console.log('[Auto] Process is now waiting for authorization code');
+                }
+
+                // Check if login is completed
+                if (!loginCompleted && data.includes('Logged in as ')) {
+                  loginCompleted = true;
+                  console.log('[Auto] Login completed detected!');
+
+                  // Extract email from the "Logged in as" message
+                  const emailMatch = data.match(/Logged in as ([^\s\r\n]+)/);
+                  const userEmail = emailMatch ? emailMatch[1] : null;
+                  console.log('[Auto] User email detected:', userEmail);
+
+                  // Set state to trigger Enter keypresses in the main component
+                  setLoginCompletedData({ userEmail });
+                }
+              },
+            }),
+          )
+          .catch((err) => {
+            console.error('Error piping output:', err);
+          });
 
         // Connect terminal input to process
         terminal.onData((data) => {
           const writer = process.input.getWriter();
-          writer.write(data).then(() => {
-            writer.releaseLock();
-          }).catch(err => {
-            console.error('Error writing input:', err);
-          });
+          writer
+            .write(data)
+            .then(() => {
+              writer.releaseLock();
+            })
+            .catch((err) => {
+              console.error('Error writing input:', err);
+            });
         });
       }
 
@@ -456,6 +487,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
         if (exitCode !== 0 && !claudeLoginUrl) {
           console.error(`Process exited with code ${exitCode}`);
         }
+
         processRef.current = null;
         isProcessConnectedRef.current = false;
       });
@@ -464,8 +496,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
       setTimeout(() => {
         if (!claudeLoginUrl) {
           setIsExtractingUrl(false);
+
           if (xtermRef.current) {
-            xtermRef.current.writeln('\r\n\x1b[31mTimeout waiting for login URL. Please complete the setup in the terminal.\x1b[0m');
+            xtermRef.current.writeln(
+              '\r\n\x1b[31mTimeout waiting for login URL. Please complete the setup in the terminal.\x1b[0m',
+            );
           }
         }
       }, 120000); // 2 minutes timeout
@@ -477,15 +512,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
 
   const handleApiKeySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!apiKey.trim()) {
       setError('Please enter your API key');
       return;
     }
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       await onAuthenticate({ type: 'apiKey', value: apiKey });
     } catch (err) {
@@ -503,80 +538,86 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
 
   const handleAuthCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!authCode.trim()) {
       setError('Please enter your authorization code');
       return;
     }
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       // Send the auth code to the existing Claude Code process
       if (processRef.current && xtermRef.current) {
         // Show the terminal so user can see what's happening
         setShowTerminal(true);
-        
+
         console.log('[Auth] Sending authorization code to existing process...');
         console.log('[Auth] Auth code (length:', authCode.length, '):', authCode);
         console.log('[Auth] Process ref exists:', !!processRef.current);
         console.log('[Auth] Terminal ref exists:', !!xtermRef.current);
-        
+
         // Check if the process is still alive first
         const processExitPromise = processRef.current.exit;
         const processFinished = await Promise.race([
           processExitPromise,
-          new Promise(resolve => setTimeout(() => resolve('still-running'), 100))
+          new Promise((resolve) => setTimeout(() => resolve('still-running'), 100)),
         ]);
-        
+
         if (processFinished !== 'still-running') {
           throw new Error(`Process already exited with code: ${processFinished}`);
         }
-        
+
         console.log('[Auth] Process is still running, sending auth code...');
-        
+
         console.log('[Auth] Manually triggering the terminal input handler...');
-        
-        // Directly call the terminal's onData handler with our auth code + enter
-        // This is the same handler that processes manual keyboard input
-        // Look at the terminal connection code around line 230 to see this handler
-        
+
+        /*
+         * Directly call the terminal's onData handler with our auth code + enter
+         * This is the same handler that processes manual keyboard input
+         * Look at the terminal connection code around line 230 to see this handler
+         */
+
         // Send the auth code
         console.log('[Auth] Triggering auth code input...');
-        
-        // Send each character to simulate typing
-        for (let i = 0; i < authCode.length; i++) {
-          // Find and call the terminal's input handler function directly
-          const char = authCode[i];
-          
-          // Get the writer and send the character (same as the onData handler does)
-          const writer = processRef.current.input.getWriter();
-          await writer.write(char);
-          writer.releaseLock();
-          
-          // Also display it in the terminal
-          xtermRef.current.write(char);
-          
-          await new Promise(resolve => setTimeout(resolve, 10));
-        }
-        
-        console.log('[Auth] Auth code sent, now sending Enter...');
-        
-        // Send Enter
+
+        // Clean the auth code to remove any special characters or formatting
+        const cleanAuthCode = authCode.trim().replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+        console.log('[Auth] Cleaned auth code (length:', cleanAuthCode.length, ')');
+
+        // Send the entire auth code at once instead of character by character
         const writer = processRef.current.input.getWriter();
-        await writer.write('\r');
-        writer.releaseLock();
-        
-        // Also display Enter in terminal
-        xtermRef.current.write('\r\n');
-        
-        console.log('[Auth] Enter sent');
-        
+
+        try {
+          // Write the entire auth code
+          await writer.write(cleanAuthCode);
+          console.log('[Auth] Auth code written to process');
+
+          // Display in terminal
+          xtermRef.current.write(cleanAuthCode);
+
+          // Small delay before sending Enter
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
+          console.log('[Auth] Sending Enter...');
+
+          // Send Enter
+          await writer.write('\r');
+
+          // Display Enter in terminal
+          xtermRef.current.write('\r\n');
+
+          console.log('[Auth] Enter sent');
+        } finally {
+          writer.releaseLock();
+        }
+
         // Wait for the process to complete authentication
         console.log('[Auth] Waiting for authentication to complete...');
+
         const exitCode = await processRef.current.exit;
-        
+
         if (exitCode === 0) {
           // Authentication successful, now call onAuthenticate to complete the flow
           await onAuthenticate({ type: 'claude', value: authCode });
@@ -786,11 +827,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
         </AnimatePresence>
 
         {/* xterm.js Terminal - Always rendered but hidden by default */}
-        <motion.div
-          initial={false}
-          animate={{ height: showTerminal ? 'auto' : 0 }}
-          className="mt-6 overflow-hidden"
-        >
+        <motion.div initial={false} animate={{ height: showTerminal ? 'auto' : 0 }} className="mt-6 overflow-hidden">
           <div className="bg-gray-900 dark:bg-gray-950 rounded-lg overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2 bg-gray-800 dark:bg-gray-900 border-b border-gray-700">
               <span className="text-xs text-gray-400 font-mono">Claude Code Terminal</span>
@@ -800,15 +837,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                 <div className="w-3 h-3 rounded-full bg-green-500"></div>
               </div>
             </div>
-            
-            <div 
-              ref={terminalRef} 
+
+            <div
+              ref={terminalRef}
               className="h-96 xterm-screen"
-              style={{ 
-                padding: '8px', 
+              style={{
+                padding: '8px',
                 height: showTerminal ? '384px' : '1px',
                 visibility: showTerminal ? 'visible' : 'hidden',
-                position: showTerminal ? 'relative' : 'absolute'
+                position: showTerminal ? 'relative' : 'absolute',
               }}
             />
           </div>

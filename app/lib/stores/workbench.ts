@@ -80,8 +80,8 @@ export class WorkbenchStore {
     this.#terminalStore.toggleTerminal(value);
   }
 
-  attachTerminal(terminal: ITerminal) {
-    this.#terminalStore.attachTerminal(terminal);
+  attachTerminal(terminal: ITerminal, initialCommand?: string) {
+    this.#terminalStore.attachTerminal(terminal, initialCommand);
   }
 
   onTerminalResize(cols: number, rows: number) {
@@ -307,10 +307,12 @@ export class WorkbenchStore {
   }
 
   goToTestStep(index: number) {
-    // clear any existing highlight first to ensure we see the change
-    // when stepping within the same file
+    /*
+     * clear any existing highlight first to ensure we see the change
+     * when stepping within the same file
+     */
     this.#testStore.clearHighlight();
-    
+
     // directly go to step without delays
     this.#testStore.goToStep(index);
 
@@ -320,9 +322,11 @@ export class WorkbenchStore {
     if (highlightedLine) {
       // Set the selected file to ensure it's loaded
       this.setSelectedFile(highlightedLine.filePath);
-      
-      // The highlighting is now handled by the reactive effect in the editor component
-      // that watches for changes to highlightedLine
+
+      /*
+       * The highlighting is now handled by the reactive effect in the editor component
+       * that watches for changes to highlightedLine
+       */
     }
   }
 
