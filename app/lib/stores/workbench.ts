@@ -9,7 +9,8 @@ import { EditorStore } from './editor';
 import { FilesStore, type FileMap } from './files';
 import { PreviewsStore } from './previews';
 import { TerminalStore } from './terminal';
-import { TestStore, type DebugStep } from './test';
+import { gitStore } from './git';
+import { TestStore } from './test';
 
 export interface ArtifactState {
   id: string;
@@ -22,13 +23,14 @@ export type ArtifactUpdateState = Pick<ArtifactState, 'title' | 'closed'>;
 
 type Artifacts = MapStore<Record<string, ArtifactState>>;
 
-export type WorkbenchViewType = 'code' | 'test' | 'preview';
+export type WorkbenchViewType = 'code' | 'git' | 'preview';
 
 export class WorkbenchStore {
   #previewsStore = new PreviewsStore(webcontainer);
   #filesStore = new FilesStore(webcontainer);
   #editorStore = new EditorStore(this.#filesStore);
   #terminalStore = new TerminalStore(webcontainer);
+  #gitStore = gitStore;
   #testStore = new TestStore(webcontainer);
 
   artifacts: Artifacts = import.meta.hot?.data.artifacts ?? map({});
@@ -294,6 +296,30 @@ export class WorkbenchStore {
     return artifacts[id];
   }
 
+  get gitDiff() {
+    return this.#gitStore.diff;
+  }
+
+  get gitLoading() {
+    return this.#gitStore.loading;
+  }
+
+  get gitError() {
+    return this.#gitStore.error;
+  }
+
+  async fetchGitDiff() {
+    await this.#gitStore.fetchDiff();
+  }
+
+  clearGitDiff() {
+    this.#gitStore.clearDiff();
+  }
+
+  get highlightedLine() {
+    return this.#testStore.highlightedLine;
+  }
+
   get testSuites() {
     return this.#testStore.testSuites;
   }
@@ -314,44 +340,20 @@ export class WorkbenchStore {
     return this.#testStore.testStats;
   }
 
-  get highlightedLine() {
-    return this.#testStore.highlightedLine;
-  }
-
   async runTests() {
-    await this.#testStore.runTests();
+    return this.#testStore.runTests();
   }
 
-  selectTest(testSteps: DebugStep[]) {
-    this.#testStore.selectTest(testSteps);
+  selectTest(stepsDebug: any[]) {
+    return this.#testStore.selectTest(stepsDebug);
   }
 
-  goToTestStep(index: number) {
-    /*
-     * clear any existing highlight first to ensure we see the change
-     * when stepping within the same file
-     */
-    this.#testStore.clearHighlight();
-
-    // directly go to step without delays
-    this.#testStore.goToStep(index);
-
-    const highlightedLine = this.#testStore.highlightedLine.get();
-    console.log('DEBUG - WorkbenchStore - goToTestStep - highlightedLine:', highlightedLine);
-
-    if (highlightedLine) {
-      // Set the selected file to ensure it's loaded
-      this.setSelectedFile(highlightedLine.filePath);
-
-      /*
-       * The highlighting is now handled by the reactive effect in the editor component
-       * that watches for changes to highlightedLine
-       */
-    }
+  goToStep(index: number) {
+    return this.#testStore.goToStep(index);
   }
 
-  clearTestHighlight() {
-    this.#testStore.clearHighlight();
+  clearHighlight() {
+    return this.#testStore.clearHighlight();
   }
 }
 

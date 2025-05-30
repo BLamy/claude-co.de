@@ -16,13 +16,14 @@ import { cubicEasingFn } from '~/utils/easings';
 import { renderLogger } from '~/utils/logger';
 import { EditorPanel } from './EditorPanel';
 import { Preview } from './Preview';
-import { TestExplorerPanel } from './TestExplorerPanel';
+import { GitPanel } from './GitPanel';
 import { SearchPanel } from './SearchPanel';
 import { FileTree } from './FileTree';
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels';
 import { themeStore } from '~/lib/stores/theme';
 import { Terminal, type TerminalRef } from './terminal/Terminal';
 import { TopBar } from './TopBar';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip';
 
 interface WorkspaceProps {
   chatStarted?: boolean;
@@ -64,9 +65,15 @@ export const Workbench = memo(({ chatStarted: _chatStarted, isStreaming }: Works
   const showTerminal = useStore(workbenchStore.showTerminal);
   const theme = useStore(themeStore);
 
-  const [activeSidebarPanel, setActiveSidebarPanel] = useState<'files' | 'tests' | 'search'>('files');
+  const [activeSidebarPanel, setActiveSidebarPanel] = useState<'files' | 'git' | 'search'>('files');
   const [isWide, setIsWide] = useState(false);
   const { ref: containerRef, width: containerWidth = 0 } = useResizeObserver<HTMLDivElement>();
+  
+  // Sidebar state
+  const [sidebarWidth, setSidebarWidth] = useState(25);
+  const [sidebarMode, setSidebarMode] = useState<'full' | 'compact' | 'minimal'>('full');
+  const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
+  const originalSidebarSize = useRef(25);
 
   // terminal state
   const terminalRefs = useRef<Record<string, TerminalRef | null>>({});
@@ -137,8 +144,35 @@ export const Workbench = memo(({ chatStarted: _chatStarted, isStreaming }: Works
     workbenchStore.resetCurrentDocument();
   }, []);
 
-  const toggleSidebarPanel = useCallback((panel: 'files' | 'tests' | 'search') => {
+  const toggleSidebarPanel = useCallback((panel: 'files' | 'git' | 'search') => {
     setActiveSidebarPanel(panel);
+    
+    // If in minimal mode, expand sidebar on click
+    if (sidebarMode === 'minimal') {
+      sidebarPanelRef.current?.resize(originalSidebarSize.current);
+      setSidebarMode('full');
+    }
+  }, [sidebarMode]);
+  
+  // Handle sidebar resize
+  const handleSidebarResize = useCallback((size: number) => {
+    setSidebarWidth(size);
+    
+    // Determine sidebar mode based on width
+    if (size <= 10) {
+      setSidebarMode('minimal');
+      // Snap to minimal size
+      if (sidebarPanelRef.current && size !== 3.5) {
+        setTimeout(() => {
+          sidebarPanelRef.current?.resize(3.5);
+        }, 0);
+      }
+    } else if (size <= 24) {
+      setSidebarMode('compact');
+    } else {
+      setSidebarMode('full');
+      originalSidebarSize.current = size;
+    }
   }, []);
 
   const addTerminal = () => {
@@ -339,105 +373,244 @@ export const Workbench = memo(({ chatStarted: _chatStarted, isStreaming }: Works
   );
 
   return (
-    <motion.div
-      initial="open"
-      animate="open"
-      variants={workbenchVariants}
-      className="z-workbench h-full w-full"
-      ref={containerRef}
-    >
-      <div className="fixed inset-0 z-0">
-        <div className="h-full w-full">
-          <div className="h-full flex flex-col bg-bolt-elements-background-depth-2 border border-bolt-elements-borderColor shadow-sm overflow-hidden">
-            <TopBar 
-              selectedView={selectedView}
-              onViewChange={setSelectedView}
-              hasPreview={hasPreview}
-              isWide={isWide}
-            />
-            <div className="relative flex-1 overflow-hidden">
-              <div className="h-full flex">
-                {/* Main content area: Sidebar + Editor + Terminal */}
-                <div className="flex-1">
-                  <PanelGroup direction="vertical">
-                    <Panel defaultSize={showTerminal ? DEFAULT_EDITOR_SIZE : 100} minSize={20}>
-                      <div className="h-full flex">
-                        {/* Left sidebar with FileTree and TestExplorerPanel */}
-                        <div className="w-[250px] h-full border-r border-bolt-elements-borderColor">
-                          <div className="flex items-center bg-bolt-elements-background-depth-1 border-b border-bolt-elements-borderColor">
-                            <div className="flex w-full">
-                              <button
-                                className={classNames(
-                                  'flex-1 py-2 px-3 font-medium text-sm',
-                                  activeSidebarPanel === 'files'
-                                    ? 'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent border-b-2 border-bolt-brand'
-                                    : 'bg-bolt-elements-item-backgroundActive text-bolt-elements-textSecondary hover:bg-bolt-elements-item-backgroundAccent',
-                                )}
-                                onClick={() => toggleSidebarPanel('files')}
-                              >
-                                <div className="flex items-center justify-center">
-                                  <div className="i-ph:folder mr-2" />
-                                  Files
+    <TooltipProvider>
+      <motion.div
+        initial="open"
+        animate="open"
+        variants={workbenchVariants}
+        className="z-workbench h-full w-full"
+        ref={containerRef}
+      >
+        <div className="fixed inset-0 z-0">
+          <div className="h-full w-full">
+            <div className="h-full flex flex-col bg-bolt-elements-background-depth-2 border border-bolt-elements-borderColor shadow-sm overflow-hidden">
+              <TopBar 
+                selectedView={selectedView}
+                onViewChange={setSelectedView}
+                hasPreview={hasPreview}
+                isWide={isWide}
+              />
+              <div className="relative flex-1 overflow-hidden">
+                <div className="h-full">
+                  {/* Main content area with preview: resizable layout */}
+                  <PanelGroup direction="horizontal" className="flex-1">
+                  {/* Sidebar + Editor + Terminal */}
+                  <Panel defaultSize={isWide ? 60 : 100} minSize={30}>
+                    <PanelGroup direction="vertical">
+                      <Panel defaultSize={showTerminal ? DEFAULT_EDITOR_SIZE : 100} minSize={20}>
+                        {/* Sidebar + Editor: resizable layout */}
+                        <PanelGroup direction="horizontal">
+                          {/* Left sidebar with FileTree and TestExplorerPanel */}
+                          <Panel 
+                            ref={sidebarPanelRef}
+                            defaultSize={25} 
+                            minSize={3.5} 
+                            maxSize={40}
+                            onResize={handleSidebarResize}
+                            style={sidebarMode === 'minimal' ? { minWidth: '42px', maxWidth: '42px', width: '42px' } : {}}
+                          >
+                            <div className="h-full border-r border-bolt-elements-borderColor">
+                              <div className={classNames(
+                                "bg-bolt-elements-background-depth-1 border-b border-bolt-elements-borderColor",
+                                sidebarMode === 'minimal' ? 'h-full' : ''
+                              )}>
+                                <div className={classNames(
+                                  sidebarMode === 'minimal' ? 'flex-col h-full' : 'flex-row',
+                                  'flex w-full'
+                                )}>
+                                  {/* Files button */}
+                                  {sidebarMode === 'full' ? (
+                                    <button
+                                      className={classNames(
+                                        'flex-1 py-2 px-3 font-medium text-sm',
+                                        activeSidebarPanel === 'files'
+                                          ? 'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent border-b-2 border-bolt-brand'
+                                          : 'bg-bolt-elements-item-backgroundActive text-bolt-elements-textSecondary hover:bg-bolt-elements-item-backgroundAccent',
+                                      )}
+                                      onClick={() => toggleSidebarPanel('files')}
+                                    >
+                                      <div className="flex items-center justify-center">
+                                        <div className="i-ph:folder mr-2" />
+                                        Files
+                                      </div>
+                                    </button>
+                                  ) : (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <button
+                                          className={classNames(
+                                            sidebarMode === 'minimal' ? 'w-full py-3' : 'flex-1 py-2 px-2',
+                                            'font-medium text-sm',
+                                            activeSidebarPanel === 'files'
+                                              ? 'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent'
+                                              : 'bg-bolt-elements-item-backgroundActive text-bolt-elements-textSecondary hover:bg-bolt-elements-item-backgroundAccent',
+                                            sidebarMode === 'minimal' && activeSidebarPanel === 'files' ? 'border-l-2 border-bolt-brand' : '',
+                                            sidebarMode === 'compact' && activeSidebarPanel === 'files' ? 'border-b-2 border-bolt-brand' : ''
+                                          )}
+                                          onClick={() => toggleSidebarPanel('files')}
+                                        >
+                                          <div className="flex items-center justify-center">
+                                            <div className="i-ph:folder text-lg" />
+                                          </div>
+                                        </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side={sidebarMode === 'minimal' ? 'right' : 'bottom'}>
+                                        Files
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  
+                                  {/* Git button */}
+                                  {sidebarMode === 'full' ? (
+                                    <button
+                                      className={classNames(
+                                        'flex-1 py-2 px-3 font-medium text-sm',
+                                        activeSidebarPanel === 'git'
+                                          ? 'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent border-b-2 border-bolt-brand'
+                                          : 'bg-bolt-elements-item-backgroundActive text-bolt-elements-textSecondary hover:bg-bolt-elements-item-backgroundAccent',
+                                      )}
+                                      onClick={() => toggleSidebarPanel('git')}
+                                    >
+                                      <div className="flex items-center justify-center">
+                                        <div className="i-ph:git-branch mr-2" />
+                                        Git
+                                      </div>
+                                    </button>
+                                  ) : (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <button
+                                          className={classNames(
+                                            sidebarMode === 'minimal' ? 'w-full py-3' : 'flex-1 py-2 px-2',
+                                            'font-medium text-sm',
+                                            activeSidebarPanel === 'git'
+                                              ? 'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent'
+                                              : 'bg-bolt-elements-item-backgroundActive text-bolt-elements-textSecondary hover:bg-bolt-elements-item-backgroundAccent',
+                                            sidebarMode === 'minimal' && activeSidebarPanel === 'git' ? 'border-l-2 border-bolt-brand' : '',
+                                            sidebarMode === 'compact' && activeSidebarPanel === 'git' ? 'border-b-2 border-bolt-brand' : ''
+                                          )}
+                                          onClick={() => toggleSidebarPanel('git')}
+                                        >
+                                          <div className="flex items-center justify-center">
+                                            <div className="i-ph:git-branch text-lg" />
+                                          </div>
+                                        </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side={sidebarMode === 'minimal' ? 'right' : 'bottom'}>
+                                        Git
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  
+                                  {/* Search button */}
+                                  {sidebarMode === 'full' ? (
+                                    <button
+                                      className={classNames(
+                                        'flex-1 py-2 px-3 font-medium text-sm',
+                                        activeSidebarPanel === 'search'
+                                          ? 'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent border-b-2 border-bolt-brand'
+                                          : 'bg-bolt-elements-item-backgroundActive text-bolt-elements-textSecondary hover:bg-bolt-elements-item-backgroundAccent',
+                                      )}
+                                      onClick={() => toggleSidebarPanel('search')}
+                                    >
+                                      <div className="flex items-center justify-center">
+                                        <div className="i-ph:magnifying-glass mr-2" />
+                                        Search
+                                      </div>
+                                    </button>
+                                  ) : (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <button
+                                          className={classNames(
+                                            sidebarMode === 'minimal' ? 'w-full py-3' : 'flex-1 py-2 px-2',
+                                            'font-medium text-sm',
+                                            activeSidebarPanel === 'search'
+                                              ? 'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent'
+                                              : 'bg-bolt-elements-item-backgroundActive text-bolt-elements-textSecondary hover:bg-bolt-elements-item-backgroundAccent',
+                                            sidebarMode === 'minimal' && activeSidebarPanel === 'search' ? 'border-l-2 border-bolt-brand' : '',
+                                            sidebarMode === 'compact' && activeSidebarPanel === 'search' ? 'border-b-2 border-bolt-brand' : ''
+                                          )}
+                                          onClick={() => toggleSidebarPanel('search')}
+                                        >
+                                          <div className="flex items-center justify-center">
+                                            <div className="i-ph:magnifying-glass text-lg" />
+                                          </div>
+                                        </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side={sidebarMode === 'minimal' ? 'right' : 'bottom'}>
+                                        Search
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
                                 </div>
-                              </button>
-                              <button
-                                className={classNames(
-                                  'flex-1 py-2 px-3 font-medium text-sm',
-                                  activeSidebarPanel === 'tests'
-                                    ? 'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent border-b-2 border-bolt-brand'
-                                    : 'bg-bolt-elements-item-backgroundActive text-bolt-elements-textSecondary hover:bg-bolt-elements-item-backgroundAccent',
-                                )}
-                                onClick={() => toggleSidebarPanel('tests')}
-                              >
-                                <div className="flex items-center justify-center">
-                                  <div className="i-ph:bug mr-2" />
-                                  Tests
+                              </div>
+
+                              {sidebarMode !== 'minimal' && (
+                                <div className="h-[calc(100%-40px)] overflow-hidden">
+                                  {activeSidebarPanel === 'files' ? (
+                                    <FileTree
+                                      className="h-full p-2"
+                                      files={files}
+                                      hideRoot
+                                      unsavedFiles={unsavedFiles}
+                                      rootFolder={WORK_DIR}
+                                      selectedFile={selectedFile}
+                                      onFileSelect={onFileSelect}
+                                    />
+                                  ) : activeSidebarPanel === 'git' ? (
+                                    <GitPanel />
+                                  ) : (
+                                    <SearchPanel onFileSelect={onFileSelect} />
+                                  )}
                                 </div>
-                              </button>
-                              <button
-                                className={classNames(
-                                  'flex-1 py-2 px-3 font-medium text-sm',
-                                  activeSidebarPanel === 'search'
-                                    ? 'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent border-b-2 border-bolt-brand'
-                                    : 'bg-bolt-elements-item-backgroundActive text-bolt-elements-textSecondary hover:bg-bolt-elements-item-backgroundAccent',
-                                )}
-                                onClick={() => toggleSidebarPanel('search')}
-                              >
-                                <div className="flex items-center justify-center">
-                                  <div className="i-ph:magnifying-glass mr-2" />
-                                  Search
-                                </div>
-                              </button>
+                              )}
                             </div>
-                          </div>
+                          </Panel>
 
-                          <div className="h-[calc(100%-40px)] overflow-hidden">
-                            {activeSidebarPanel === 'files' ? (
-                              <FileTree
-                                className="h-full p-2"
-                                files={files}
-                                hideRoot
-                                unsavedFiles={unsavedFiles}
-                                rootFolder={WORK_DIR}
-                                selectedFile={selectedFile}
-                                onFileSelect={onFileSelect}
-                              />
-                            ) : activeSidebarPanel === 'tests' ? (
-                              <TestExplorerPanel />
-                            ) : (
-                              <SearchPanel onFileSelect={onFileSelect} />
-                            )}
-                          </div>
-                        </div>
+                          <PanelResizeHandle />
 
-                        {/* Editor panel */}
-                        <div className="flex-1">
-                          <div className="relative h-full overflow-hidden">
-                            {!isWide && (
-                              <View
-                                initial={{ x: selectedView === 'code' ? 0 : '-100%' }}
-                                animate={{ x: selectedView === 'code' ? 0 : '-100%' }}
-                              >
+                          {/* Editor panel */}
+                          <Panel defaultSize={75} minSize={20}>
+                            <div className="relative h-full overflow-hidden" style={{ minWidth: 0 }}>
+                              {!isWide && (
+                                <View
+                                  initial={{ x: selectedView === 'code' ? 0 : '-100%' }}
+                                  animate={{ x: selectedView === 'code' ? 0 : '-100%' }}
+                                >
+                                  <EditorPanel
+                                    editorDocument={currentDocument}
+                                    isStreaming={isStreaming}
+                                    selectedFile={selectedFile}
+                                    files={files}
+                                    unsavedFiles={unsavedFiles}
+                                    onFileSelect={onFileSelect}
+                                    onEditorScroll={onEditorScroll}
+                                    onEditorChange={onEditorChange}
+                                    onFileSave={onFileSave}
+                                    onFileReset={onFileReset}
+                                    hideFileExplorer={true}
+                                    hideTerminal={true}
+                                  />
+                                </View>
+                              )}
+                              {!isWide && (
+                                <View
+                                  initial={{ x: selectedView === 'preview' ? 0 : '100%' }}
+                                  animate={{ x: selectedView === 'preview' ? 0 : '100%' }}
+                                >
+                                  <Preview />
+                                </View>
+                              )}
+                              {!isWide && (
+                                <View
+                                  initial={{ x: selectedView === 'git' ? 0 : '100%' }}
+                                  animate={{ x: selectedView === 'git' ? 0 : '100%' }}
+                                >
+                                  <GitPanel />
+                                </View>
+                              )}
+                              {isWide && (
                                 <EditorPanel
                                   editorDocument={currentDocument}
                                   isStreaming={isStreaming}
@@ -452,46 +625,27 @@ export const Workbench = memo(({ chatStarted: _chatStarted, isStreaming }: Works
                                   hideFileExplorer={true}
                                   hideTerminal={true}
                                 />
-                              </View>
-                            )}
-                            {!isWide && (
-                              <View
-                                initial={{ x: selectedView === 'preview' ? 0 : '100%' }}
-                                animate={{ x: selectedView === 'preview' ? 0 : '100%' }}
-                              >
-                                <Preview />
-                              </View>
-                            )}
-                            {isWide && (
-                              <EditorPanel
-                                editorDocument={currentDocument}
-                                isStreaming={isStreaming}
-                                selectedFile={selectedFile}
-                                files={files}
-                                unsavedFiles={unsavedFiles}
-                                onFileSelect={onFileSelect}
-                                onEditorScroll={onEditorScroll}
-                                onEditorChange={onEditorChange}
-                                onFileSave={onFileSave}
-                                onFileReset={onFileReset}
-                                hideFileExplorer={true}
-                                hideTerminal={true}
-                              />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </Panel>
-                    {renderTerminal()}
-                  </PanelGroup>
-                </div>
+                              )}
+                            </div>
+                          </Panel>
+                        </PanelGroup>
+                      </Panel>
+                      {renderTerminal()}
+                    </PanelGroup>
+                  </Panel>
 
-                {/* Preview panel - only show when wide */}
-                {isWide && (
-                  <div className="flex-1 border-l border-bolt-elements-borderColor">
-                    <Preview />
-                  </div>
-                )}
+                  {/* Preview panel - only show when wide */}
+                  {isWide && (
+                    <>
+                      <PanelResizeHandle />
+                      <Panel defaultSize={40} minSize={20}>
+                        <div className="h-full border-l border-bolt-elements-borderColor">
+                          <Preview />
+                        </div>
+                      </Panel>
+                    </>
+                  )}
+                </PanelGroup>
               </div>
             </div>
             
@@ -503,6 +657,7 @@ export const Workbench = memo(({ chatStarted: _chatStarted, isStreaming }: Works
         </div>
       </div>
     </motion.div>
+    </TooltipProvider>
   );
 });
 

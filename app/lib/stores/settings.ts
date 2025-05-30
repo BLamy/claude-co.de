@@ -30,7 +30,7 @@ export interface Settings {
   proxy: ProxySettings;
 }
 
-const DEFAULT_CORS_PROXY_ADDRESS = window.location.origin + '/api';
+const DEFAULT_CORS_PROXY_ADDRESS = typeof window !== 'undefined' ? window.location.origin + '/api' : '/api';
 const DEFAULT_CORS_AUTH_TOKEN = '1234567890';
 
 export const shortcutsStore = map<Shortcuts>({

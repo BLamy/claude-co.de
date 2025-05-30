@@ -764,7 +764,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                 <button
                   type="button"
                   onClick={() => setAuthMethod('none')}
-                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-medium text-gray-700 dark:text-black hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   Back
                 </button>
@@ -810,7 +810,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                 <button
                   type="button"
                   onClick={() => setAuthMethod('none')}
-                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-medium text-gray-700 dark:text-black hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   Back
                 </button>

@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, existsSync } from 'fs';
-import { join, resolve } from 'path';
+import { join, resolve, extname } from 'path';
 import type { Plugin, ViteDevServer } from 'vite';
+import { transpile } from 'typescript';
 
 interface WebcontainerFilesPluginOptions {
   moduleId?: string;
@@ -62,13 +63,35 @@ export default function webcontainerFilesPlugin(options: WebcontainerFilesPlugin
                   readDirRecursive(fullPath, currentTree[entry.name].directory);
                 } else {
                   // create file node
-                  const contents = readFileSync(fullPath, 'utf-8');
-                  currentTree[entry.name] = {
+                  const fileExtension = extname(entry.name);
+                  let contents = readFileSync(fullPath, 'utf-8');
+                  let fileName = entry.name;
+
+                  // compile TypeScript files to JavaScript
+                  if (fileExtension === '.ts') {
+                    try {
+                      contents = transpile(contents, {
+                        target: 5, // es2015
+                        module: 1, // commonJS
+                      });
+
+                      // change file extension from .ts to .js
+                      fileName = entry.name.replace(/\.ts$/, '.js');
+                      console.log(`[webcontainer-files plugin] Compiled TypeScript file: ${entry.name} -> ${fileName}`);
+                    } catch (err) {
+                      console.error(`[webcontainer-files plugin] Error compiling TypeScript file ${entry.name}:`, err);
+
+                      // fallback to original content if compilation fails
+                    }
+                  }
+
+                  currentTree[fileName] = {
                     file: {
+                      name: fileName,
                       contents,
                     },
                   };
-                  console.log(`[webcontainer-files plugin] Added file: ${entry.name}`);
+                  console.log(`[webcontainer-files plugin] Added file: ${fileName}`);
                 }
               }
             } catch (err) {
@@ -79,6 +102,9 @@ export default function webcontainerFilesPlugin(options: WebcontainerFilesPlugin
           readDirRecursive(webcontainerDir, filesTree);
 
           console.log(`[webcontainer-files plugin] Generated filesTree with ${Object.keys(filesTree).length} entries`);
+          
+          // Debug: log the full structure
+          console.log('[webcontainer-files plugin] Full filesTree structure:', JSON.stringify(filesTree, null, 2));
 
           return `export const files = ${JSON.stringify(filesTree, null, 2)};`;
         } catch (error: unknown) {

@@ -2,7 +2,6 @@ import type { PathWatcherEvent, WebContainer } from '@webcontainer/api';
 import { getEncoding } from 'istextorbinary';
 import { map, type MapStore } from 'nanostores';
 import { Buffer } from 'node:buffer';
-import * as nodePath from 'node:path';
 import { bufferWatchEvents } from '~/utils/buffer';
 import { WORK_DIR } from '~/utils/constants';
 import { computeFileModifications } from '~/utils/diff';
@@ -85,7 +84,9 @@ export class FilesStore {
     const webcontainer = await this.#webcontainer;
 
     try {
-      const relativePath = nodePath.relative(webcontainer.workdir, filePath);
+      // Simple relative path calculation
+      const workdir = webcontainer.workdir.endsWith('/') ? webcontainer.workdir : webcontainer.workdir + '/';
+      const relativePath = filePath.startsWith(workdir) ? filePath.slice(workdir.length) : filePath;
 
       if (!relativePath) {
         throw new Error(`EINVAL: invalid file path, write '${relativePath}'`);

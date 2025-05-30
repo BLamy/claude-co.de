@@ -1,0 +1,2 @@
+Hello, this is a test file to demonstrate git diff functionality.
+This file will show up in the git diff panel when changes are made.

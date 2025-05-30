@@ -64,22 +64,36 @@ export const Terminal = memo(
     }, []);
 
     useEffect(() => {
-      const terminal = terminalRef.current!;
+      const terminal = terminalRef.current;
+
+      if (!terminal) {
+        return;
+      }
 
       // we render a transparent cursor in case the terminal is readonly
       terminal.options.theme = getTerminalTheme(readonly ? { cursor: '#00000000' } : {});
-
       terminal.options.disableStdin = readonly;
+
+      // force the terminal to refresh and re-render with new theme
+      terminal.refresh(0, terminal.rows - 1);
     }, [theme, readonly]);
 
     useImperativeHandle(ref, () => {
       return {
         reloadStyles: () => {
-          const terminal = terminalRef.current!;
+          const terminal = terminalRef.current;
+
+          if (!terminal) {
+            return;
+          }
+
           terminal.options.theme = getTerminalTheme(readonly ? { cursor: '#00000000' } : {});
+
+          // force the terminal to refresh and re-render with new theme
+          terminal.refresh(0, terminal.rows - 1);
         },
       };
-    }, []);
+    }, [readonly]);
 
     return <div className={className} ref={terminalElementRef} />;
   }),
