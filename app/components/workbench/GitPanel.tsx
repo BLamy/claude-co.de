@@ -54,7 +54,7 @@ export function GitPanel() {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col dark:text-white">
       <div className="flex items-center justify-between p-2 border-b">
         <h2 className="text-sm font-medium">Git Changes</h2>
         <IconButton
@@ -72,7 +72,9 @@ export function GitPanel() {
           </div>
         ) : (
           <div className="text-xs">
-            {diff.files.map((file) => (
+            {diff.files
+              .filter(file => !file.path.startsWith('.bolt/'))
+              .map((file) => (
               <div key={file.path} className="border-b">
                 <div
                   className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer"
