@@ -11,7 +11,15 @@ const args = process.argv.slice(3);
 
 // Helper function to dynamically import the http module when needed
 async function getHttp() {
-  return (await import('isomorphic-git/http/node/index.js')).default;
+  try {
+    // Since this will be bundled, we can import directly
+    const http = (await import('isomorphic-git/http/web/index.js')).default;
+    console.log('Loaded isomorphic-git web HTTP module');
+    return http;
+  } catch (e) {
+    console.error('Failed to load HTTP module:', e);
+    throw new Error('Could not load HTTP module for isomorphic-git');
+  }
 }
 
 async function main() {
@@ -60,18 +68,27 @@ async function main() {
         console.log(`Cloning ${url}...`);
         try {
           const http = await getHttp();
+          console.log('HTTP module loaded successfully');
+          
+          // Add .git extension if not present
+          const cloneUrl = url.endsWith('.git') ? url : `${url}.git`;
+          console.log(`Using clone URL: ${cloneUrl}`);
+          
           await git.clone({
             fs,
             http,
             dir,
-            url,
+            url: cloneUrl,
             singleBranch: true,
-            depth: 1
+            depth: 1,
+            corsProxy: 'https://cors.isomorphic-git.org'
           });
           console.log('Cloned successfully');
         } catch (error: unknown) {
           const err = error instanceof Error ? error : new Error(String(error));
           console.error('Clone failed:', err.message);
+          console.error('Full error:', err);
+          process.exit(1);
         }
         break;
 

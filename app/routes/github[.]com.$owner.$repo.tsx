@@ -51,22 +51,31 @@ export default function GitHubRepo() {
 
         console.log(`Starting clone of ${repoUrl}...`);
 
-        // Use the webcontainer's custom git implementation to clone
-        console.log('Starting git clone with custom implementation...');
-        const installIsomorphicGit = await container.spawn('pnpm', ['install', 'isomorphic-git'], {
+        // First, install isomorphic-git in the .bolt/bin directory
+        console.log('Installing isomorphic-git...');
+        const installProcess = await container.spawn('npm', ['install', 'isomorphic-git@1.24.5'], {
           output: true,
           cwd: './.bolt/bin',
         });
-        await installIsomorphicGit.exit;
-        const cloneProcess = await container.spawn('node', ['./.bolt/bin/git.js', 'clone', repoUrl], {
+        
+        const installExitCode = await installProcess.exit;
+        if (installExitCode !== 0) {
+          throw new Error(`Failed to install isomorphic-git with exit code ${installExitCode}`);
+        }
+        
+        // Use the webcontainer's custom git implementation to clone
+        const cloneProcess = await container.spawn('node', ['./.bolt/bin/git.js', 'clone', repoUrl.replace(/\.git$/, '')], {
           output: true,
         });
+        console.log('Starting git clone with custom implementation...');
 
         let cloneOutput = '';
         
         // Listen for output to track progress
         cloneProcess.output.pipeTo(new WritableStream({
           write(data) {
+            console.log('Clone output:', data);
+
             let text: string;
             if (data instanceof Uint8Array || data instanceof ArrayBuffer) {
               text = new TextDecoder().decode(data);
@@ -76,16 +85,15 @@ export default function GitHubRepo() {
               text = String(data);
             }
             cloneOutput += text;
-            console.log('Clone output:', text);
           },
         }));
 
         // Wait for the clone to complete
-        const exitCode = await cloneProcess.exit;
+        const exitCode2 = await cloneProcess.exit;
         
-        if (exitCode !== 0) {
+        if (exitCode2 !== 0) {
           console.error('Git clone failed with output:', cloneOutput);
-          throw new Error(`Git clone failed with exit code ${exitCode}. Output: ${cloneOutput}`);
+          throw new Error(`Git clone failed with exit code ${exitCode2}. Output: ${cloneOutput}`);
         }
 
         // if (isCancelled) return;

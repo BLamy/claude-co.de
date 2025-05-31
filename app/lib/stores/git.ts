@@ -44,7 +44,22 @@ class GitStore {
     try {
       const instance = await webcontainer;
       console.log('WebContainer instance ready, spawning git diff...');
-      
+      // Ensure git.js exists and install isomorphic-git
+      try {
+        await instance.fs.readFile('./.bolt/bin/git.js');
+        
+        // Install isomorphic-git
+        console.log('Installing isomorphic-git for git diff...');
+        const installProcess = await instance.spawn('npm', ['install', 'isomorphic-git@1.24.5'], {
+          output: true,
+          cwd: './.bolt/bin',
+        });
+        await installProcess.exit;
+      } catch (e) {
+        console.log('Git script not found, skipping git diff');
+        this.#error.set('Git functionality not available');
+        return;
+      }
       const process = await instance.spawn('node', ['./.bolt/bin/git.js', 'diff']);
       
       let output = '';

@@ -29,7 +29,7 @@ export default function webcontainerFilesPlugin(options: WebcontainerFilesPlugin
       return undefined;
     },
 
-    load(id: string): string | undefined {
+    async load(id: string): Promise<string | undefined> {
       if (id === resolvedVirtualModuleId) {
         const rootDir = process.cwd();
         console.log(`[webcontainer-files plugin] Root directory: ${rootDir}`);
@@ -46,7 +46,7 @@ export default function webcontainerFilesPlugin(options: WebcontainerFilesPlugin
             return `export const files = {};`;
           }
 
-          function readDirRecursive(dir: string, currentTree: Record<string, any>): void {
+          async function readDirRecursive(dir: string, currentTree: Record<string, any>): Promise<void> {
             console.log(`[webcontainer-files plugin] Reading directory: ${dir}`);
 
             try {
@@ -60,7 +60,7 @@ export default function webcontainerFilesPlugin(options: WebcontainerFilesPlugin
                   currentTree[entry.name] = { directory: {} };
 
                   // continue recursion with the directory's contents
-                  readDirRecursive(fullPath, currentTree[entry.name].directory);
+                  await readDirRecursive(fullPath, currentTree[entry.name].directory);
                 } else {
                   // create file node
                   const fileExtension = extname(entry.name);
@@ -99,7 +99,7 @@ export default function webcontainerFilesPlugin(options: WebcontainerFilesPlugin
             }
           }
 
-          readDirRecursive(webcontainerDir, filesTree);
+          await readDirRecursive(webcontainerDir, filesTree);
 
           console.log(`[webcontainer-files plugin] Generated filesTree with ${Object.keys(filesTree).length} entries`);
           
