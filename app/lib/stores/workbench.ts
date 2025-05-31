@@ -355,6 +355,22 @@ export class WorkbenchStore {
   clearHighlight() {
     return this.#testStore.clearHighlight();
   }
+
+  get diffView() {
+    return this.#editorStore.diffView;
+  }
+
+  openDiffView(filePath: string, originalContent: string, modifiedContent: string) {
+    return this.#editorStore.openDiffView(filePath, originalContent, modifiedContent);
+  }
+
+  closeDiffView() {
+    return this.#editorStore.closeDiffView();
+  }
+
+  getFile(filePath: string) {
+    return this.#filesStore.getFile(filePath);
+  }
 }
 
 export const workbenchStore = new WorkbenchStore();

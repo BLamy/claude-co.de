@@ -6,11 +6,20 @@ export type EditorDocuments = Record<string, EditorDocument>;
 
 type SelectedFile = WritableAtom<string | undefined>;
 
+export interface DiffViewState {
+  filePath: string;
+  originalContent: string;
+  modifiedContent: string;
+}
+
+type DiffView = WritableAtom<DiffViewState | undefined>;
+
 export class EditorStore {
   #filesStore: FilesStore;
 
   selectedFile: SelectedFile = import.meta.hot?.data.selectedFile ?? atom<string | undefined>();
   documents: MapStore<EditorDocuments> = import.meta.hot?.data.documents ?? map({});
+  diffView: DiffView = import.meta.hot?.data.diffView ?? atom<DiffViewState | undefined>();
 
   currentDocument = computed([this.documents, this.selectedFile], (documents, selectedFile) => {
     if (!selectedFile) {
@@ -26,6 +35,7 @@ export class EditorStore {
     if (import.meta.hot) {
       import.meta.hot.data.documents = this.documents;
       import.meta.hot.data.selectedFile = this.selectedFile;
+      import.meta.hot.data.diffView = this.diffView;
     }
   }
 
@@ -91,5 +101,17 @@ export class EditorStore {
         value: newContent,
       });
     }
+  }
+
+  openDiffView(filePath: string, originalContent: string, modifiedContent: string) {
+    this.diffView.set({
+      filePath,
+      originalContent,
+      modifiedContent,
+    });
+  }
+
+  closeDiffView() {
+    this.diffView.set(undefined);
   }
 }

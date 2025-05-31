@@ -40,57 +40,50 @@ class GitStore {
   async fetchDiff() {
     this.#loading.set(true);
     this.#error.set(null);
-    
+
     try {
       const instance = await webcontainer;
       console.log('WebContainer instance ready, spawning git diff...');
-      // Ensure git.js exists and install isomorphic-git
+
+      // ensure git.js exists and install isomorphic-git
       try {
         await instance.fs.readFile('./.bolt/bin/git.js');
-        
-        // Install isomorphic-git
+
+        // install isomorphic-git in .bolt/bin directory to avoid affecting project dependencies
         console.log('Installing isomorphic-git for git diff...');
+
         const installProcess = await instance.spawn('npm', ['install', 'isomorphic-git@1.24.5'], {
           output: true,
           cwd: './.bolt/bin',
         });
         await installProcess.exit;
-      } catch (e) {
+      } catch {
         console.log('Git script not found, skipping git diff');
         this.#error.set('Git functionality not available');
+
         return;
       }
+
       const process = await instance.spawn('node', ['./.bolt/bin/git.js', 'diff']);
-      
+
       let output = '';
-      let errorOutput = '';
-      
+
       process.output.pipeTo(
         new WritableStream({
           write(data) {
             output += data;
           },
-        })
+        }),
       );
-      
-      if (process.error) {
-        process.error.pipeTo(
-          new WritableStream({
-            write(data) {
-              errorOutput += data;
-            },
-          })
-        );
-      }
-      
+
       const exitCode = await process.exit;
       console.log('Git diff exit code:', exitCode);
       console.log('Git diff output:', output);
-      console.log('Git diff error:', errorOutput);
-      
+
       if (exitCode === 0) {
         console.log('Raw git diff output length:', output.length);
         console.log('First 500 chars of output:', output.substring(0, 500));
+
         const parsedDiff = this.#parseDiff(output);
         console.log('Parsed diff files:', parsedDiff);
         this.#diff.set({
@@ -98,7 +91,7 @@ class GitStore {
           files: parsedDiff,
         });
       } else {
-        this.#error.set(`Failed to get git diff. Exit code: ${exitCode}. Error: ${errorOutput}`);
+        this.#error.set(`Failed to get git diff. Exit code: ${exitCode}`);
       }
     } catch (err) {
       console.error('Error in fetchDiff:', err);
@@ -111,22 +104,27 @@ class GitStore {
   #parseDiff(diff: string): GitDiffFile[] {
     const files: GitDiffFile[] = [];
     const lines = diff.split('\n');
-    
+
     let currentFile: GitDiffFile | null = null;
     let currentChunk: GitDiffChunk | null = null;
     let oldLineNum = 1;
     let newLineNum = 1;
-    
+
     for (const line of lines) {
-      // File header
-      if (line.startsWith('diff --git')) {
-        console.log('Found diff line:', JSON.stringify(line));
-        console.log('Line length:', line.length);
-        // Try a simple split approach
-        const parts = line.split(' ');
+      // clean line of any carriage returns and extra whitespace
+      const cleanLine = line.replace(/\r/g, '').trim();
+
+      // file header
+      if (cleanLine.startsWith('diff --git')) {
+        console.log('Found diff line:', JSON.stringify(cleanLine));
+        console.log('Line length:', cleanLine.length);
+
+        // try a simple split approach
+        const parts = cleanLine.split(' ');
+
         if (parts.length >= 4) {
-          const aPath = parts[2].substring(2); // Remove 'a/'
-          const bPath = parts[3].substring(2); // Remove 'b/'
+          const aPath = parts[2].substring(2); // remove 'a/'
+          const bPath = parts[3].substring(2); // remove 'b/'
           console.log('Extracted paths:', aPath, bPath);
           currentFile = {
             path: bPath,
@@ -135,7 +133,8 @@ class GitStore {
             chunks: [],
           };
           files.push(currentFile);
-          // Create a default chunk for simple diffs without @@ headers
+
+          // create a default chunk for simple diffs without @@ headers
           currentChunk = {
             oldStart: 1,
             oldLines: 0,
@@ -148,9 +147,10 @@ class GitStore {
           newLineNum = 1;
         }
       }
-      // Chunk header (if present)
-      else if (line.startsWith('@@')) {
-        const match = line.match(/@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@/);
+      // chunk header (if present)
+      else if (cleanLine.startsWith('@@')) {
+        const match = cleanLine.match(/@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@/);
+
         if (match && currentFile) {
           currentChunk = {
             oldStart: parseInt(match[1], 10),
@@ -162,39 +162,129 @@ class GitStore {
           currentFile.chunks.push(currentChunk);
         }
       }
-      // Skip --- and +++ lines
-      else if (line.startsWith('---') || line.startsWith('+++')) {
+      // skip --- and +++ lines
+      else if (cleanLine.startsWith('---') || cleanLine.startsWith('+++')) {
         continue;
       }
-      // Diff lines
-      else if (currentFile && currentChunk && (line.startsWith('+') || line.startsWith('-') || line.startsWith(' '))) {
-        const type = line.startsWith('+') ? 'add' : line.startsWith('-') ? 'remove' : 'context';
+      // diff lines
+      else if (
+        currentFile &&
+        currentChunk &&
+        (cleanLine.startsWith('+') || cleanLine.startsWith('-') || cleanLine.startsWith(' '))
+      ) {
+        const type = cleanLine.startsWith('+') ? 'add' : cleanLine.startsWith('-') ? 'remove' : 'context';
         const diffLine: GitDiffLine = {
           type,
-          content: line.substring(1),
+          content: cleanLine.substring(1),
         };
-        
+
         if (type === 'context') {
           diffLine.oldLineNumber = oldLineNum++;
           diffLine.newLineNumber = newLineNum++;
         } else if (type === 'add') {
           diffLine.newLineNumber = newLineNum++;
-          if (currentFile) currentFile.additions++;
+
+          if (currentFile) {
+            currentFile.additions++;
+          }
         } else if (type === 'remove') {
           diffLine.oldLineNumber = oldLineNum++;
-          if (currentFile) currentFile.deletions++;
+
+          if (currentFile) {
+            currentFile.deletions++;
+          }
         }
-        
+
         currentChunk.lines.push(diffLine);
       }
     }
-    
+
     return files;
   }
 
   clearDiff() {
     this.#diff.set(null);
     this.#error.set(null);
+  }
+
+  async getOriginalFileContent(filePath: string): Promise<string> {
+    const instance = await webcontainer;
+
+    try {
+      // create the git show script
+      const gitShowScript = `
+const git = require('isomorphic-git');
+const fs = require('fs');
+
+async function showFile() {
+  try {
+    const [commit, path] = process.argv[2].split(':');
+    const result = await git.readBlob({
+      fs,
+      dir: '/home/project',
+      oid: await git.resolveRef({ fs, dir: '/home/project', ref: commit }),
+      filepath: path
+    });
+    
+    const content = Buffer.from(result.blob).toString('utf8');
+    process.stdout.write(content);
+    process.exit(0);
+  } catch (error) {
+    if (error.code === 'NotFoundError') {
+      // file doesn't exist in the commit (new file)
+      process.exit(0);
+    }
+    console.error(error.message);
+    process.exit(1);
+  }
+}
+
+showFile();
+`;
+
+      // write the show script
+      await instance.fs.writeFile('./.bolt/bin/git-show.js', gitShowScript);
+
+      // install isomorphic-git if needed
+      try {
+        await instance.fs.readFile('./node_modules/isomorphic-git/package.json');
+      } catch {
+        // install in .bolt/bin directory to avoid affecting project dependencies
+        const installProcess = await instance.spawn('npm', ['install', 'isomorphic-git'], {
+          cwd: './.bolt/bin',
+        });
+        await installProcess.exit;
+      }
+
+      // run the script to get file content
+      const process = await instance.spawn('node', ['./.bolt/bin/git-show.js', `HEAD:${filePath}`]);
+
+      let output = '';
+
+      const outputStream = new WritableStream({
+        write(chunk) {
+          output += chunk;
+        },
+      });
+
+      process.output.pipeTo(outputStream);
+
+      const exitCode = await process.exit;
+
+      if (exitCode === 0) {
+        return output;
+      } else {
+        // file might be new (not in HEAD), return empty string
+        if (output === '') {
+          return '';
+        }
+
+        throw new Error(`Failed to get original content for ${filePath}`);
+      }
+    } catch (err) {
+      console.error('Error getting original file content:', err);
+      throw err;
+    }
   }
 }
 

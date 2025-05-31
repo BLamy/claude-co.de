@@ -1,40 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useStore } from '@nanostores/react';
 import { gitStore } from '~/lib/stores/git';
+import { workbenchStore } from '~/lib/stores/workbench';
 import { LoadingDots } from '~/components/ui/LoadingDots';
 import { IconButton } from '~/components/ui/IconButton';
+import { WORK_DIR } from '~/utils/constants';
 
 export function GitPanel() {
   const diff = useStore(gitStore.diff);
   const isLoading = useStore(gitStore.loading);
   const error = useStore(gitStore.error);
-  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
 
-  const toggleFile = (path: string) => {
-    const newExpanded = new Set(expandedFiles);
-    if (newExpanded.has(path)) {
-      newExpanded.delete(path);
-    } else {
-      newExpanded.add(path);
+  const openDiffView = async (filePath: string) => {
+    try {
+      // get current file content - resolve relative path to absolute path
+      const absolutePath = filePath.startsWith('/') ? filePath : `${WORK_DIR}/${filePath}`;
+
+      const currentFile = workbenchStore.getFile(absolutePath);
+
+      if (!currentFile || currentFile.type !== 'file') {
+        console.error('❌ File not found in files store:', absolutePath);
+        return;
+      }
+
+      // get original file content from git
+      const originalContent = await gitStore.getOriginalFileContent(filePath);
+      const modifiedContent = currentFile.content;
+
+      // open diff view in editor
+      workbenchStore.openDiffView(absolutePath, originalContent, modifiedContent);
+    } catch (error) {
+      console.error('❌ Failed to open diff view:', error);
     }
-    setExpandedFiles(newExpanded);
   };
 
   useEffect(() => {
     gitStore.fetchDiff();
   }, []);
 
-  useEffect(() => {
-    // Expand all files by default when diff updates
-    if (diff?.files) {
-      setExpandedFiles(new Set(diff.files.map(f => f.path)));
-    }
-  }, [diff]);
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <LoadingDots />
+        <LoadingDots text="Loading git diff..." />
       </div>
     );
   }
@@ -64,67 +71,28 @@ export function GitPanel() {
           className="text-xs"
         />
       </div>
-      
+
       <div className="flex-1 overflow-auto">
         {!diff || diff.files.length === 0 ? (
-          <div className="p-4 text-muted-foreground text-sm">
-            No changes detected
-          </div>
+          <div className="p-4 text-muted-foreground text-sm">No changes detected</div>
         ) : (
           <div className="text-xs">
             {diff.files
-              .filter(file => !file.path.startsWith('.bolt/'))
+              .filter((file) => !file.path.startsWith('.bolt/'))
               .map((file) => (
-              <div key={file.path} className="border-b">
-                <div
-                  className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer"
-                  onClick={() => toggleFile(file.path)}
-                >
-                  <span className={`transition-transform ${expandedFiles.has(file.path) ? 'rotate-90' : ''}`}>
-                    ▶
-                  </span>
-                  <span className="flex-1 font-mono">{file.path}</span>
-                  <span className="text-green-600">+{file.additions}</span>
-                  <span className="text-red-600">-{file.deletions}</span>
-                </div>
-                
-                {expandedFiles.has(file.path) && (
-                  <div className="bg-secondary/20">
-                    {file.chunks.map((chunk, chunkIndex) => (
-                      <div key={chunkIndex} className="font-mono">
-                        <div className="px-2 py-1 bg-accent/50 text-xs text-muted-foreground">
-                          @@ -{chunk.oldStart},{chunk.oldLines} +{chunk.newStart},{chunk.newLines} @@
-                        </div>
-                        {chunk.lines.map((line, lineIndex) => (
-                          <div
-                            key={lineIndex}
-                            className={`flex ${
-                              line.type === 'add' ? 'bg-green-500/10' : 
-                              line.type === 'remove' ? 'bg-red-500/10' : ''
-                            }`}
-                          >
-                            <span className="w-12 px-1 text-right text-muted-foreground select-none">
-                              {line.oldLineNumber || ''}
-                            </span>
-                            <span className="w-12 px-1 text-right text-muted-foreground select-none">
-                              {line.newLineNumber || ''}
-                            </span>
-                            <span className={`px-1 select-none ${
-                              line.type === 'add' ? 'text-green-600' : 
-                              line.type === 'remove' ? 'text-red-600' : 
-                              'text-muted-foreground'
-                            }`}>
-                              {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
-                            </span>
-                            <span className="flex-1 whitespace-pre">{line.content}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
+                <div key={file.path} className="border-b">
+                  <div
+                    className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer"
+                    onClick={() => openDiffView(file.path)}
+                  >
+                    <span className="flex-1 font-mono hover:text-primary" title="Click to open diff view">
+                      {file.path}
+                    </span>
+                    <span className="text-green-600">+{file.additions}</span>
+                    <span className="text-red-600">-{file.deletions}</span>
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              ))}
           </div>
         )}
       </div>

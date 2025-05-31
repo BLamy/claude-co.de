@@ -9,6 +9,7 @@ import {
   type OnSaveCallback as OnEditorSave,
   type OnScrollCallback as OnEditorScroll,
 } from '~/components/editor/codemirror/CodeMirrorEditor';
+import { DiffEditor } from '~/components/editor/codemirror/DiffEditor';
 import { IconButton } from '~/components/ui/IconButton';
 import { PanelHeader } from '~/components/ui/PanelHeader';
 import { PanelHeaderButton } from '~/components/ui/PanelHeaderButton';
@@ -64,6 +65,7 @@ export const EditorPanel = memo(
 
     const theme = useStore(themeStore);
     const showTerminal = useStore(workbenchStore.showTerminal);
+    const diffView = useStore(workbenchStore.diffView);
 
     const terminalRefs = useRef<Record<string, TerminalRef | null>>({});
     const terminalPanelRef = useRef<ImperativePanelHandle>(null);
@@ -158,35 +160,55 @@ export const EditorPanel = memo(
             )}
             <Panel className="flex flex-col" defaultSize={hideFileExplorer ? 100 : 80} minSize={20}>
               <PanelHeader className="overflow-x-auto">
-                {activeFileSegments?.length && (
+                {diffView ? (
                   <div className="flex items-center flex-1 text-sm">
-                    <FileBreadcrumb pathSegments={activeFileSegments} files={files} onFileSelect={onFileSelect} />
-                    {activeFileUnsaved && (
-                      <div className="flex gap-1 ml-auto -mr-1.5">
-                        <PanelHeaderButton onClick={onFileSave}>
-                          <div className="i-ph:floppy-disk-duotone" />
-                          Save
-                        </PanelHeaderButton>
-                        <PanelHeaderButton onClick={onFileReset}>
-                          <div className="i-ph:clock-counter-clockwise-duotone" />
-                          Reset
-                        </PanelHeaderButton>
-                      </div>
-                    )}
+                    <span className="font-medium">Diff View: {diffView.filePath}</span>
+                    <div className="flex gap-1 ml-auto -mr-1.5">
+                      <PanelHeaderButton onClick={() => workbenchStore.closeDiffView()}>
+                        <div className="i-ph:x" />
+                        Close
+                      </PanelHeaderButton>
+                    </div>
                   </div>
+                ) : (
+                  activeFileSegments?.length && (
+                    <div className="flex items-center flex-1 text-sm">
+                      <FileBreadcrumb pathSegments={activeFileSegments} files={files} onFileSelect={onFileSelect} />
+                      {activeFileUnsaved && (
+                        <div className="flex gap-1 ml-auto -mr-1.5">
+                          <PanelHeaderButton onClick={onFileSave}>
+                            <div className="i-ph:floppy-disk-duotone" />
+                            Save
+                          </PanelHeaderButton>
+                          <PanelHeaderButton onClick={onFileReset}>
+                            <div className="i-ph:clock-counter-clockwise-duotone" />
+                            Reset
+                          </PanelHeaderButton>
+                        </div>
+                      )}
+                    </div>
+                  )
                 )}
               </PanelHeader>
               <div className="h-full flex-1 overflow-hidden">
-                <CodeMirrorEditor
-                  theme={theme}
-                  editable={!isStreaming && editorDocument !== undefined}
-                  settings={editorSettings}
-                  doc={editorDocument}
-                  autoFocusOnDocumentChange={!isMobile()}
-                  onScroll={onEditorScroll}
-                  onChange={onEditorChange}
-                  onSave={onFileSave}
-                />
+                {diffView ? (
+                  <DiffEditor
+                    originalContent={diffView.originalContent}
+                    modifiedContent={diffView.modifiedContent}
+                    filePath={diffView.filePath}
+                  />
+                ) : (
+                  <CodeMirrorEditor
+                    theme={theme}
+                    editable={!isStreaming && editorDocument !== undefined}
+                    settings={editorSettings}
+                    doc={editorDocument}
+                    autoFocusOnDocumentChange={!isMobile()}
+                    onScroll={onEditorScroll}
+                    onChange={onEditorChange}
+                    onSave={onFileSave}
+                  />
+                )}
               </div>
             </Panel>
           </PanelGroup>

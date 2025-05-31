@@ -1,0 +1,87 @@
+// Styles for CodeMirror merge view
+.cm-mergeView {
+  height: 100%;
+  overflow: auto;
+  
+  // Override default background colors to match theme
+  .cm-editor {
+    background-color: var(--cm-background);
+    color: var(--cm-text);
+  }
+  
+  // Gutter styling
+  .cm-mergeView-gutter {
+    background-color: var(--cm-gutter-background);
+    border-left: 1px solid var(--cm-border);
+    border-right: 1px solid var(--cm-border);
+  }
+  
+  // Change markers in gutter
+  .cm-mergeView-changed {
+    background-color: var(--color-warning) !important;
+    opacity: 0.5;
+  }
+  
+  // Highlighted changes in text
+  .cm-mergeView-changedLine {
+    background-color: var(--color-warning-muted) !important;
+  }
+  
+  .cm-mergeView-deletedLine {
+    background-color: var(--color-error-muted) !important;
+  }
+  
+  .cm-mergeView-insertedLine {
+    background-color: var(--color-success-muted) !important;
+  }
+  
+  // Revert controls between editors
+  .cm-mergeView-revert {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--cm-background);
+    border: 1px solid var(--cm-border);
+    
+    button {
+      padding: 2px 6px;
+      background-color: var(--color-primary);
+      color: var(--color-primary-foreground);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      
+      &:hover {
+        opacity: 0.8;
+      }
+    }
+  }
+  
+  // Collapse controls for unchanged sections
+  .cm-mergeView-collapse {
+    background-color: var(--cm-gutter-background);
+    color: var(--cm-text-secondary);
+    cursor: pointer;
+    padding: 4px 8px;
+    text-align: center;
+    font-size: 12px;
+    border: 1px solid var(--cm-border);
+    
+    &:hover {
+      background-color: var(--cm-hover-background);
+    }
+  }
+}
+
+// Container styles
+.diff-editor-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  
+  .diff-editor-header {
+    background-color: var(--color-background-depth-2);
+    border-bottom: 1px solid var(--color-border);
+  }
+}
