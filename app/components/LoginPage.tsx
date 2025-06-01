@@ -10,6 +10,22 @@ interface LoginPageProps {
   isWebContainerReady?: boolean;
 }
 
+const ClaudeLogo = () => (
+  <svg
+    height="3rem"
+    width="3rem"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    className="flex-shrink-0"
+  >
+    <title>Claude</title>
+    <path
+      d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"
+      fill="#D97757"
+    />
+  </svg>
+);
+
 export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebContainerReady = false }) => {
   const [authMethod, setAuthMethod] = useState<'none' | 'apiKey' | 'claude'>('none');
   const [apiKey, setApiKey] = useState('');
@@ -234,11 +250,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                 console.log('[Auto] completeAuthenticationFlow returned successfully');
               } catch (err) {
                 console.error('[Auto] Error in authentication flow:', err);
-                console.error('[Auto] Error stack:', err.stack);
+                console.error('[Auto] Error stack:', (err as Error).stack);
                 console.error('[Auto] JSON output was:', jsonOutput.substring(0, 200) + '...');
 
                 // Set error for user
-                setError('Authentication failed: ' + err.message);
+                setError('Authentication failed: ' + (err as Error).message);
               }
             } else {
               console.error('[Auto] Failed to read .claude.json file');
@@ -292,7 +308,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
           console.log('[Auth] onAuthenticate completed successfully');
         } catch (authErr) {
           console.error('[Auth] onAuthenticate failed:', authErr);
-          console.error('[Auth] onAuthenticate error stack:', authErr.stack);
+          console.error('[Auth] onAuthenticate error stack:', (authErr as Error).stack);
           throw authErr;
         }
       } else {
@@ -635,22 +651,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-bolt-elements-background-depth-1 via-bolt-elements-background-depth-1 to-bolt-elements-background-depth-2">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-3xl p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl"
+        className="w-full max-w-3xl p-8 bg-bolt-elements-background-depth-2 border border-bolt-elements-borderColor rounded-2xl shadow-xl"
       >
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Welcome to Bolt</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Choose your authentication method</p>
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <ClaudeLogo />
+            <h1 className="text-3xl font-bold text-bolt-elements-textPrimary">claude-co.de</h1>
+          </div>
+          <p className="text-sm text-bolt-elements-textSecondary">
+            Please wait (~30s) while we download claude code and grab a login url
+          </p>
         </div>
 
         {error && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-lg"
+            className="mb-6 p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-800"
           >
             {error}
           </motion.div>
@@ -668,7 +689,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
               <button
                 onClick={handleClaudeLogin}
                 disabled={!claudeLoginUrl || isLoading}
-                className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg font-medium transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                className="w-full px-6 py-4 bg-gradient-to-r from-[#D97757] to-[#c5684a] hover:from-[#c5684a] hover:to-[#b85f43] disabled:from-bolt-elements-borderColor disabled:to-bolt-elements-borderColor text-white rounded-lg font-medium transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg"
               >
                 {!isWebContainerReady ? (
                   <>
@@ -697,10 +718,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                 )}
               </button>
 
-              <button
+              {/* <button
                 onClick={() => setAuthMethod('apiKey')}
                 disabled={isLoading}
-                className="w-full px-6 py-4 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 text-gray-900 dark:text-white rounded-lg font-medium transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                className="w-full px-6 py-4 bg-bolt-elements-background-depth-1 border-2 border-bolt-elements-borderColor hover:border-[#D97757] text-bolt-elements-textPrimary hover:text-[#D97757] rounded-lg font-medium transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-3"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -711,13 +732,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                   />
                 </svg>
                 <span>Add API Key</span>
-              </button>
+              </button> */}
 
               {isExtractingUrl && (
                 <button
                   type="button"
                   onClick={() => setShowTerminal(!showTerminal)}
-                  className="w-full py-2 px-4 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white border border-gray-300 dark:border-gray-600 rounded-lg transition-all flex items-center justify-center gap-2"
+                  className="w-full py-2 px-4 text-sm bg-bolt-elements-background-depth-1 text-bolt-elements-textSecondary hover:bg-bolt-elements-background-depth-3 hover:text-bolt-elements-textPrimary border border-bolt-elements-borderColor rounded-lg transition-all flex items-center justify-center gap-2"
                 >
                   <svg
                     className={`w-4 h-4 transition-transform ${showTerminal ? 'rotate-180' : ''}`}
@@ -743,7 +764,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
               className="space-y-4"
             >
               <div>
-                <label htmlFor="apiKey" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="apiKey" className="block text-sm font-medium text-bolt-elements-textPrimary mb-2">
                   Anthropic API Key
                 </label>
                 <input
@@ -751,11 +772,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                   id="apiKey"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  className="w-full px-4 py-3 border border-bolt-elements-borderColor rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D97757] focus:border-[#D97757] bg-bolt-elements-background-depth-1 text-bolt-elements-textPrimary placeholder-bolt-elements-textSecondary"
                   placeholder="sk-ant-..."
                   autoFocus
                 />
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-2 text-xs text-bolt-elements-textSecondary">
                   Your API key will be encrypted and stored securely using biometric authentication
                 </p>
               </div>
@@ -764,14 +785,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                 <button
                   type="button"
                   onClick={() => setAuthMethod('none')}
-                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-medium text-gray-700 dark:text-black hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="flex-1 px-4 py-3 border border-bolt-elements-borderColor rounded-lg font-medium text-bolt-elements-textSecondary hover:bg-bolt-elements-background-depth-3 hover:text-bolt-elements-textPrimary transition-colors"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors"
+                  className="flex-1 px-4 py-3 bg-[#D97757] hover:bg-[#c5684a] disabled:bg-bolt-elements-borderColor text-white rounded-lg font-medium transition-colors"
                 >
                   {isLoading ? 'Authenticating...' : 'Continue'}
                 </button>
@@ -789,7 +810,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
               className="space-y-4"
             >
               <div>
-                <label htmlFor="authCode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="authCode" className="block text-sm font-medium text-bolt-elements-textPrimary mb-2">
                   Authorization Code
                 </label>
                 <input
@@ -797,11 +818,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                   id="authCode"
                   value={authCode}
                   onChange={(e) => setAuthCode(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white font-mono"
+                  className="w-full px-4 py-3 border border-bolt-elements-borderColor rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D97757] focus:border-[#D97757] bg-bolt-elements-background-depth-1 text-bolt-elements-textPrimary font-mono placeholder-bolt-elements-textSecondary"
                   placeholder="Enter the code from Anthropic"
                   autoFocus
                 />
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-2 text-xs text-bolt-elements-textSecondary">
                   Paste the authorization code you received after logging in with Anthropic
                 </p>
               </div>
@@ -810,14 +831,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
                 <button
                   type="button"
                   onClick={() => setAuthMethod('none')}
-                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-medium text-gray-700 dark:text-black hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="flex-1 px-4 py-3 border border-bolt-elements-borderColor rounded-lg font-medium text-bolt-elements-textSecondary hover:bg-bolt-elements-background-depth-3 hover:text-bolt-elements-textPrimary transition-colors"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors"
+                  className="flex-1 px-4 py-3 bg-[#D97757] hover:bg-[#c5684a] disabled:bg-bolt-elements-borderColor text-white rounded-lg font-medium transition-colors"
                 >
                   {isLoading ? 'Authenticating...' : 'Complete Login'}
                 </button>
@@ -828,7 +849,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
 
         {/* xterm.js Terminal - Always rendered but hidden by default */}
         <motion.div initial={false} animate={{ height: showTerminal ? 'auto' : 0 }} className="mt-6 overflow-hidden">
-          <div className="bg-gray-900 dark:bg-gray-950 rounded-lg overflow-hidden">
+          <div className="bg-gray-900 dark:bg-gray-950 rounded-lg overflow-hidden border border-bolt-elements-borderColor">
             <div className="flex items-center justify-between px-4 py-2 bg-gray-800 dark:bg-gray-900 border-b border-gray-700">
               <span className="text-xs text-gray-400 font-mono">Claude Code Terminal</span>
               <div className="flex gap-2">
@@ -851,8 +872,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
           </div>
         </motion.div>
 
-        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-          <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+        <div className="mt-8 pt-6 border-t border-bolt-elements-borderColor">
+          <p className="text-xs text-center text-bolt-elements-textSecondary">
             Your credentials are encrypted with biometric authentication for secure access
           </p>
         </div>

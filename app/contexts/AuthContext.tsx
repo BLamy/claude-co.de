@@ -307,7 +307,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Welcome back!</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">Use your biometrics to access Bolt</p>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">Use your biometrics to access claude-co.de</p>
             {error && <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>}
             <button
               onClick={attemptBiometricLogin}
@@ -361,7 +361,7 @@ export async function startRegistration(email: string) {
   const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
     challenge,
     rp: {
-      name: 'Bolt',
+      name: 'claude-co.de',
       id: window.location.hostname,
     },
     user: {

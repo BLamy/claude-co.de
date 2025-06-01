@@ -5,9 +5,10 @@ import { ClientOnly } from 'remix-utils/client-only';
 import { Workbench } from '~/components/workbench/Workbench.client';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { webcontainer } from '~/lib/webcontainer';
+import { addRecentProject } from '~/lib/stores/recent-projects';
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  const title = data ? `${data.owner}/${data.repo} - Bolt` : 'Cloning Repository - Bolt';
+  const title = data ? `${data.owner}/${data.repo} - claude-co.de` : 'Cloning Repository - claude-co.de';
   return [
     { title },
     { name: 'description', content: `Development environment for ${data?.owner}/${data?.repo}` },
@@ -33,6 +34,11 @@ export default function GitHubRepo() {
   const navigation = useNavigation();
   const [cloneStatus, setCloneStatus] = useState<'idle' | 'cloning' | 'success' | 'error'>('idle');
   const [cloneError, setCloneError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Save to recent projects when component mounts
+    addRecentProject(owner, repo);
+  }, [owner, repo]);
 
   useEffect(() => {
     let isCancelled = false;
