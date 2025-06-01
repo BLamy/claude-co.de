@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useState, useCallback, useEffect } from 'react';
 import { SearchIcon, Settings, User, Github, Server, Paintbrush } from 'lucide-react';
+import { CommandPalette } from './CommandPalette';
 import { Button } from '~/components/ui/button';
 import * as RadixDialog from '@radix-ui/react-dialog';
 import {
@@ -28,6 +29,7 @@ import { useStore } from '@nanostores/react';
 import { themeStore, toggleTheme } from '~/lib/stores/theme';
 import { proxySettingsStore, setCorsAuthToken, setCorsProxyAddress, setCorsProxyDomains } from '~/lib/stores/settings';
 import type { WorkbenchViewType } from '~/lib/stores/workbench';
+import { workbenchStore } from '~/lib/stores/workbench';
 import { classNames } from '~/utils/classNames';
 import { motion } from 'framer-motion';
 import { cubicEasingFn } from '~/utils/easings';
@@ -68,7 +70,7 @@ export function TopBar({ className, selectedView, onViewChange, hasPreview: _has
   // command palette keyboard shortcut
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+      if (e.key === 'p' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setCommandOpen((open) => !open);
       }
@@ -84,16 +86,34 @@ export function TopBar({ className, selectedView, onViewChange, hasPreview: _has
     setTempCorsDomains(proxySettings.corsProxy.domains.join('\n'));
   }, [proxySettings]);
 
-  const handleFileOpen = useCallback((fileName: string) => {
-    // TODO: Implement file opening logic
-    console.log('Opening file:', fileName);
-    setCommandOpen(false);
-  }, []);
+  const handleFileOpen = useCallback((filePath: string) => {
+    console.log('Opening file:', filePath);
+    
+    // Use the workbench store to open the file in the editor
+    workbenchStore.setSelectedFile(filePath);
+    
+    // Switch to code view if not already there
+    if (onViewChange) {
+      onViewChange('code');
+    }
+  }, [onViewChange]);
 
   const handleCommand = useCallback((command: string) => {
-    // TODO: Implement command execution logic
     console.log('Executing command:', command);
-    setCommandOpen(false);
+    
+    switch (command) {
+      case 'toggle-terminal':
+        workbenchStore.toggleTerminal();
+        break;
+      case 'open-settings':
+        setSettingsOpen(true);
+        break;
+      case 'search-files':
+        setCommandOpen(true);
+        break;
+      default:
+        console.log('Unknown command:', command);
+    }
   }, []);
 
   const saveProxySettings = () => {
@@ -510,7 +530,7 @@ export function TopBar({ className, selectedView, onViewChange, hasPreview: _has
               <span className="text-sm text-bolt-elements-textSecondary">Search files, commands...</span>
               <div className="ml-auto">
                 <span className="text-xs text-bolt-elements-textTertiary bg-bolt-elements-background-depth-1 px-1.5 py-0.5 rounded border border-bolt-elements-borderColor">
-                  ⌘K
+                  ⌘P
                 </span>
               </div>
             </div>
@@ -574,62 +594,12 @@ export function TopBar({ className, selectedView, onViewChange, hasPreview: _has
       </div>
 
       {/* Command Palette */}
-      {commandOpen && (
-        <RadixDialog.Root open={commandOpen} onOpenChange={setCommandOpen}>
-          <RadixDialog.Portal>
-            <RadixDialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-            <RadixDialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[90vw] max-w-[600px] bg-bolt-elements-background-depth-2 border border-bolt-elements-borderColor rounded-lg shadow-lg overflow-hidden p-0">
-              <div className="flex h-9 items-center gap-2 border-b border-bolt-elements-borderColor px-3 bg-bolt-elements-background-depth-1">
-                <SearchIcon className="h-4 w-4 shrink-0 opacity-50" />
-                <input
-                  type="text"
-                  placeholder="Type a command or search..."
-                  className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-bolt-elements-textSecondary text-bolt-elements-textPrimary"
-                  autoFocus
-                />
-              </div>
-              <div className="max-h-[300px] overflow-y-auto">
-                <div className="p-1">
-                  <div className="px-2 py-1.5 text-xs font-medium text-bolt-elements-textSecondary">Recent Files</div>
-                  <button
-                    onClick={() => handleFileOpen('package.json')}
-                    className="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-bolt-elements-background-depth-3 text-bolt-elements-textPrimary transition-colors dark:hover:bg-bolt-elements-background-depth-1"
-                  >
-                    package.json
-                  </button>
-                  <button
-                    onClick={() => handleFileOpen('vite.config.ts')}
-                    className="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-bolt-elements-background-depth-3 text-bolt-elements-textPrimary transition-colors dark:hover:bg-bolt-elements-background-depth-1"
-                  >
-                    vite.config.ts
-                  </button>
-                </div>
-                <div className="p-1">
-                  <div className="px-2 py-1.5 text-xs font-medium text-bolt-elements-textSecondary">Commands</div>
-                  <button
-                    onClick={() => handleCommand('toggle-terminal')}
-                    className="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-bolt-elements-background-depth-3 text-bolt-elements-textPrimary transition-colors dark:hover:bg-bolt-elements-background-depth-1"
-                  >
-                    <span>Toggle Terminal</span>
-                    <span className="ml-auto text-xs text-bolt-elements-textTertiary">⌃`</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setCommandOpen(false);
-                      setSettingsOpen(true);
-                    }}
-                    className="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-bolt-elements-background-depth-3 text-bolt-elements-textPrimary transition-colors dark:hover:bg-bolt-elements-background-depth-1"
-                  >
-                    <Settings className="h-4 w-4" />
-                    <span>Open Settings</span>
-                    <span className="ml-auto text-xs text-bolt-elements-textTertiary">⌘,</span>
-                  </button>
-                </div>
-              </div>
-            </RadixDialog.Content>
-          </RadixDialog.Portal>
-        </RadixDialog.Root>
-      )}
+      <CommandPalette
+        open={commandOpen}
+        onOpenChange={setCommandOpen}
+        onFileSelect={handleFileOpen}
+        onCommand={handleCommand}
+      />
 
       {/* Settings Dialog */}
       <RadixDialog.Root open={settingsOpen} onOpenChange={setSettingsOpen}>

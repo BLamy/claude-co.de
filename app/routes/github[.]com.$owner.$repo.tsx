@@ -100,6 +100,78 @@ export default function GitHubRepo() {
 
         console.log('Repository cloned successfully!');
         
+        // Post-clone setup: Update package.json and run pnpm link
+        try {
+          console.log('Checking for package.json...');
+          const packageJsonPath = './package.json';
+          
+          // Check if package.json exists
+          try {
+            const packageJsonContent = await container.fs.readFile(packageJsonPath, 'utf-8');
+            const packageJson = JSON.parse(packageJsonContent);
+            
+            console.log('Found package.json, updating bin configuration...');
+            
+            // Add or update the bin field
+            if (!packageJson.bin) {
+              packageJson.bin = {};
+            }
+            packageJson.bin.git = './.bolt/bin/git.js';
+            packageJson.bin.grep = './.bolt/bin/grep.js';
+            
+            // Write the updated package.json
+            await container.fs.writeFile(packageJsonPath, JSON.stringify(packageJson, null, 2));
+            console.log('Updated package.json with git and grep bin entries');
+            
+            // Create .gitignore with .bolt/ entry if it doesn't exist or append to existing
+            try {
+              let gitignoreContent = '';
+              try {
+                gitignoreContent = await container.fs.readFile('./.gitignore', 'utf-8');
+              } catch {
+                // .gitignore doesn't exist, create it
+              }
+              
+              if (!gitignoreContent.includes('.bolt/')) {
+                gitignoreContent += gitignoreContent ? '\n.bolt/\n' : '.bolt/\n';
+                await container.fs.writeFile('./.gitignore', gitignoreContent);
+                console.log('Added .bolt/ to .gitignore');
+              } else {
+                console.log('.bolt/ already in .gitignore');
+              }
+            } catch (gitignoreError) {
+              console.error('Failed to update .gitignore:', gitignoreError);
+            }
+            
+            // Run pnpm link
+            console.log('Running pnpm link...');
+            const linkProcess = await container.spawn('pnpm', ['link', '.'], {
+              output: true,
+            });
+            
+            let linkOutput = '';
+            linkProcess.output.pipeTo(new WritableStream({
+              write(data) {
+                const text = typeof data === 'string' ? data : new TextDecoder().decode(data);
+                linkOutput += text;
+                console.log('pnpm link output:', text);
+              },
+            }));
+            
+            const linkExitCode = await linkProcess.exit;
+            if (linkExitCode !== 0) {
+              console.error('pnpm link failed:', linkOutput);
+            } else {
+              console.log('pnpm link completed successfully');
+            }
+          } catch (readError) {
+            console.log('No package.json found in cloned repository, skipping git setup');
+          }
+        } catch (setupError) {
+          console.error('Post-clone setup failed:', setupError);
+          // Don't fail the entire clone operation if post-setup fails
+        }
+        
         // Refresh the workbench to show the new files
         workbenchStore.setShowWorkbench(true);
         

@@ -296,6 +296,17 @@ export const CodeMirrorEditor = memo(
       // highlightedLine is now directly from the store via useStore
       console.log('DEBUG - CodeMirrorEditor - current doc path:', doc?.filePath);
       console.log('DEBUG - CodeMirrorEditor - highlightedLine from useStore:', highlightedLine);
+      
+      // Check if paths match with more detailed logging
+      if (highlightedLine && doc?.filePath) {
+        console.log('DEBUG - CodeMirrorEditor - path comparison:', {
+          docPath: doc.filePath,
+          highlightPath: highlightedLine.filePath,
+          exactMatch: doc.filePath === highlightedLine.filePath,
+          docPathLength: doc.filePath.length,
+          highlightPathLength: highlightedLine.filePath.length,
+        });
+      }
 
       if (highlightedLine && doc?.filePath === highlightedLine.filePath) {
         try {

@@ -130,7 +130,7 @@ export const Workbench = memo(({ chatStarted: _chatStarted, isStreaming }: Works
     workbenchStore.setCurrentDocumentScrollPosition(position);
   }, []);
 
-  const onFileSelect = useCallback((filePath: string | undefined) => {
+  const onFileSelect = useCallback((filePath: string | undefined, _line?: number) => {
     workbenchStore.setSelectedFile(filePath);
   }, []);
 

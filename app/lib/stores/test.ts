@@ -1,5 +1,6 @@
 import type { WebContainer } from '@webcontainer/api';
 import { atom, type WritableAtom } from 'nanostores';
+import { WORK_DIR } from '~/utils/constants';
 
 // Types
 export interface DebugStep {
@@ -26,8 +27,8 @@ export interface TestStats {
 }
 
 export interface HighlightedLine {
-  filePath: string;
-  line: number;
+  filePath: string; // Full path including WORK_DIR prefix (e.g., /home/project/src/file.ts)
+  line: number; // 0-based line number for CodeMirror
 }
 
 export class TestStore {
@@ -157,12 +158,16 @@ export class TestStore {
      * Extract the relative path from the full path.
      * Improved handling for various path formats.
      */
-    const filePath = extractRelativePath(step.file);
-    console.log('DEBUG - goToStep - processed file path:', filePath);
+    const relativePath = extractRelativePath(step.file);
+    console.log('DEBUG - goToStep - processed relative path:', relativePath);
+    
+    // Ensure we use the full path with WORK_DIR for consistency with editor documents
+    const fullPath = relativePath.startsWith(WORK_DIR) ? relativePath : `${WORK_DIR}/${relativePath}`;
+    console.log('DEBUG - goToStep - full file path:', fullPath);
 
     // create a new object literal to ensure reactivity
     const newHighlight = {
-      filePath,
+      filePath: fullPath,
       line: step.line,
     };
 
