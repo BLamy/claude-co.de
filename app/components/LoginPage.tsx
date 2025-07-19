@@ -357,7 +357,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticate, isWebConta
       }
 
       // Run claude-code command
-      const process = await instance.spawn('npx', ['-y', '@anthropic-ai/claude-code@1.0.3']);
+      const process = await instance.spawn('npx', ['-y', '@anthropic-ai/claude-code@1.0.56']);
       processRef.current = process;
 
       // Connect process to terminal immediately

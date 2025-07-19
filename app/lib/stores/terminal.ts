@@ -46,7 +46,7 @@ export class TerminalStore {
     const terminalInfo: TerminalInfo = {
       id,
       isClaude,
-      command: command || (isClaude ? 'npx -y @anthropic-ai/claude-code@1.0.3' : undefined),
+      command: command || (isClaude ? 'npx -y @anthropic-ai/claude-code@1.0.56' : undefined),
       isRunning: isClaude,
     };
 
