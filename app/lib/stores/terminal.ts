@@ -31,7 +31,7 @@ export class TerminalStore {
       import.meta.hot.data.activeTerminalId = this.activeTerminalId;
     }
 
-    // Initialize with one default Claude terminal
+    // initialize with one default Claude terminal
     if (Object.keys(this.terminalInfo.get()).length === 0) {
       this.createTerminal(true);
     }
@@ -52,8 +52,11 @@ export class TerminalStore {
 
     this.terminalInfo.setKey(id, terminalInfo);
 
-    if (isClaude) {
-      // Mark Claude terminals as no longer running after 5 seconds
+    if (isClaude && typeof window !== 'undefined') {
+      /**
+       * mark Claude terminals as no longer running after 5 seconds
+       * only do this in the browser, not during server-side initialization
+       */
       setTimeout(() => {
         const info = this.terminalInfo.get()[id];
 
